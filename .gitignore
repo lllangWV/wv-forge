@@ -1,0 +1,6 @@
+.env
+output/
+pixi.lock
+
+.claude/
+.pixi/
