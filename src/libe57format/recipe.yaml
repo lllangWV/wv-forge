@@ -1,0 +1,67 @@
+context:
+  version: "3.3.0"
+
+package:
+  name: libe57format
+  version: ${{ version }}
+
+source:
+  url: https://github.com/asmaloney/libE57Format/archive/refs/tags/v${{ version }}.tar.gz
+  sha256: 0ba6de5c2ff6122c847867e81bf3f987b43ce4116b4949550c9cda277099e796
+
+build:
+  number: 0
+  script:
+    - if: unix
+      then:
+        - mkdir -p build
+        - cd build
+        - cmake ${CMAKE_ARGS} -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="${PREFIX}" -DCMAKE_PREFIX_PATH="${PREFIX}" -DE57_BUILD_TEST=OFF -DE57_BUILD_SHARED=ON ..
+        - ninja -j${CPU_COUNT}
+        - ninja install
+    - if: win
+      then:
+        - mkdir build
+        - cd build
+        - cmake %CMAKE_ARGS% -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="%LIBRARY_PREFIX%" -DCMAKE_PREFIX_PATH="%LIBRARY_PREFIX%" -DE57_BUILD_TEST=OFF -DE57_BUILD_SHARED=ON ..
+        - ninja
+        - ninja install
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+    - ${{ compiler('cxx') }}
+    - cmake >=3.15
+    - ninja
+  host:
+    - xerces-c >=3.2
+  run:
+    - xerces-c >=3.2
+  run_exports:
+    weak:
+      - ${{ pin_subpackage('libe57format', upper_bound='x.x') }}
+
+tests:
+  - package_contents:
+      lib:
+        - E57Format
+      include:
+        - E57Format/E57Format.h
+
+about:
+  homepage: https://github.com/asmaloney/libE57Format
+  license: BSL-1.0
+  license_file: LICENSE.md
+  summary: Library for reading and writing E57 files
+  description: |
+    libE57Format is a C++ library which provides read & write support for the
+    ASTM-standard E57 file format on Linux, macOS, and Windows. E57 files store
+    3D point cloud data (produced by 3D imaging systems such as laser scanners),
+    and associated attributes. The library is a fork of the E57RefImpl project
+    with many bug fixes, modernization, and improvements.
+  repository: https://github.com/asmaloney/libE57Format
+  documentation: https://asmaloney.github.io/libE57Format-docs/
+
+extra:
+  recipe-maintainers:
+    - lllangWV

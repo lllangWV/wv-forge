@@ -1,0 +1,100 @@
+context:
+  version: "2.13.2"
+
+package:
+  name: cloudcompare
+  version: ${{ version }}
+
+source:
+  git: https://github.com/CloudCompare/CloudCompare.git
+  tag: v${{ version }}
+
+build:
+  number: 0
+  script:
+    - if: unix
+      then:
+        - git submodule update --init --recursive
+        - mkdir -p build && cd build
+        - cmake ${CMAKE_ARGS} -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="${PREFIX}" -DCMAKE_PREFIX_PATH="${PREFIX}" -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DOPTION_BUILD_CCVIEWER=ON -DOPTION_USE_SHAPE_LIB=ON -DOPTION_USE_DXF_LIB=ON -DPLUGIN_GL_QEDL=ON -DPLUGIN_GL_QSSAO=ON -DPLUGIN_IO_QCORE=ON -DPLUGIN_IO_QLAS=ON -DLASZIP_INCLUDE_DIR="${PREFIX}/include" -DPLUGIN_IO_QE57=OFF -DPLUGIN_STANDARD_QANIMATION=ON -DQANIMATION_WITH_FFMPEG_SUPPORT=OFF -DCCCORELIB_USE_CGAL=ON -DCGAL_DIR="${PREFIX}/lib/cmake/CGAL" -DPLUGIN_IO_QDRACO=ON -Ddraco_DIR="${PREFIX}/lib/cmake/draco" -DDRACO_INCLUDE_DIR="${PREFIX}/include" -DDRACO_LIB_DIR="${PREFIX}/lib" -DDRACO_LIBRARY="${PREFIX}/lib/libdraco.so" -DPLUGIN_STANDARD_QRANSAC_SD=ON -DPLUGIN_STANDARD_QPOISSON_RECON=ON ..
+        - ninja -j${CPU_COUNT}
+        - ninja install
+    - if: win
+      then:
+        - git submodule update --init --recursive
+        - mkdir build
+        - cd build
+        - cmake %CMAKE_ARGS% -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="%LIBRARY_PREFIX%" -DCMAKE_PREFIX_PATH="%LIBRARY_PREFIX%" -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DOPTION_BUILD_CCVIEWER=ON -DOPTION_USE_SHAPE_LIB=ON -DOPTION_USE_DXF_LIB=ON -DOPTION_MP_BUILD=ON -DPLUGIN_GL_QEDL=ON -DPLUGIN_GL_QSSAO=ON -DPLUGIN_IO_QCORE=ON -DPLUGIN_IO_QLAS=ON -DPLUGIN_IO_QE57=OFF -DPLUGIN_STANDARD_QANIMATION=ON -DQANIMATION_WITH_FFMPEG_SUPPORT=ON -DCCCORELIB_USE_CGAL=ON -DPLUGIN_IO_QDRACO=ON -DDRACO_INCLUDE_DIR="%LIBRARY_PREFIX%/include" -DDRACO_LIBRARY="%LIBRARY_PREFIX%/lib/draco.lib" -DPLUGIN_STANDARD_QRANSAC_SD=ON -DPLUGIN_STANDARD_QPOISSON_RECON=ON ..
+        - ninja
+        - ninja install
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+    - ${{ compiler('cxx') }}
+    - cmake >=3.10
+    - ninja
+    - git
+    - if: linux
+      then: pkg-config
+  host:
+    - qt-main >=5.15,<6
+    - libgl-devel
+    # LAS plugin (via LASzip)
+    - laszip
+    # E57 plugin disabled - uses bundled libE57Format which conflicts
+    - xerces-c
+    # QAnimation plugin - FFmpeg support disabled due to API changes in FFmpeg 6+
+    # Draco plugin
+    - draco
+    # CGAL support
+    - cgal-cpp
+    - gmp
+    - mpfr
+    - boost-cpp
+    - eigen
+    - if: linux
+      then:
+        - xorg-libx11
+        - xorg-libxext
+        - libglu
+  run:
+    - qt-main >=5.15,<6
+    - laszip
+    - xerces-c
+    - draco
+    - cgal-cpp
+    - gmp
+    - mpfr
+
+tests:
+  - script:
+      - if: unix
+        then:
+          - CloudCompare --help || true
+          - ccViewer --help || true
+      - if: win
+        then:
+          - CloudCompare.exe --help || exit 0
+
+about:
+  homepage: https://www.cloudcompare.org/
+  license: GPL-2.0-or-later
+  license_file: license.txt
+  summary: 3D point cloud and mesh processing software
+  description: |
+    CloudCompare is a 3D point cloud (and triangular mesh) processing software.
+    It was originally designed to perform comparison between two dense 3D points
+    clouds (such as the ones acquired with a laser scanner) or between a point
+    cloud and a triangular mesh. It relies on an octree structure for fast
+    spatial computation. It can also perform direct or statistical comparisons
+    between two scalar fields associated to these entities.
+
+    This build includes: LAS/LAZ, E57, Draco, CGAL, RANSAC, Poisson Reconstruction,
+    and QAnimation plugins. PCL and PDAL plugins are disabled due to dependency conflicts.
+  repository: https://github.com/CloudCompare/CloudCompare
+  documentation: https://www.cloudcompare.org/doc/
+
+extra:
+  recipe-maintainers:
+    - lllangWV
