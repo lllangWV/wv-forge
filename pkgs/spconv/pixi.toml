@@ -1,0 +1,18 @@
+[workspace]
+name = "spconv"
+channels = ["conda-forge", "nvidia"]
+platforms = ["linux-64"]
+preview = ["pixi-build"]
+
+[dependencies]
+spconv = { path = "." }
+
+[package]
+name = "spconv"
+version = "2.3.6"
+
+[package.build]
+backend = { name = "pixi-build-rattler-build", version = "*", channels = ["https://prefix.dev/pixi-build-backends", "conda-forge", "nvidia"] }
+
+[package.build.source]
+path = "recipe"

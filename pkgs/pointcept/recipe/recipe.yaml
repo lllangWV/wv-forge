@@ -1,0 +1,104 @@
+# Recipe for Pointcept - Point Cloud Perception Framework
+# https://github.com/Pointcept/Pointcept
+#
+# Pointcept is a research framework, not a traditional pip package.
+# This recipe packages the pointcept module and builds the pointops CUDA extension.
+
+context:
+  version: "1.6.0"
+
+package:
+  name: pointcept
+  version: ${{ version }}
+
+source:
+  git: https://github.com/Pointcept/Pointcept.git
+  tag: v${{ version }}
+  patches:
+    - patches/conda-pointops-cuda.patch
+
+build:
+  number: 0
+  script:
+    env:
+      TORCH_CUDA_ARCH_LIST: "7.0;7.5;8.0;8.6;8.9;9.0"
+      CUDA_HOME: ${{ PREFIX }}
+    content: |
+      # Copy the pointcept module to site-packages
+      mkdir -p $PREFIX/lib/python$PY_VER/site-packages/pointcept
+      cp -r pointcept/* $PREFIX/lib/python$PY_VER/site-packages/pointcept/
+
+      # Build and install pointops extension
+      cd libs/pointops
+      $PYTHON setup.py build_ext --inplace
+      $PYTHON setup.py install --single-version-externally-managed --record=record.txt
+      cd ../..
+
+      # Copy configs and tools for convenience
+      mkdir -p $PREFIX/share/pointcept
+      cp -r configs $PREFIX/share/pointcept/
+      cp -r tools $PREFIX/share/pointcept/
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+    - ${{ compiler('cxx') }}
+    - cmake
+    - ninja
+  host:
+    - python >=3.10,<3.13
+    - pip
+    - setuptools >=41.0
+    - wheel
+    - pytorch-gpu >=2.6.0
+    - numpy
+    - cuda-version 12.6.*
+    - cuda-cudart-dev
+    - cuda-nvcc
+    - libcusparse-dev
+    - libcublas-dev
+    - libcusolver-dev
+  run:
+    - python >=3.10,<3.13
+    - pytorch-gpu >=2.6.0
+    - torchvision
+    - cuda-version >=12.6,<12.7
+    - cuda-cudart >=12.6,<12.7
+    # spconv - built from source with matching CUDA version
+    - spconv
+    # PyTorch Geometric ecosystem (optional, install from pyg channel if needed)
+    # - pytorch-cluster
+    # - pytorch-scatter
+    # - pytorch-sparse
+    # - pyg
+    # Scientific computing
+    - numpy
+    - scipy
+    - h5py
+    - plyfile
+    # Configuration and logging
+    - pyyaml
+    - addict
+    - yapf
+    - termcolor
+    - timm
+    - einops
+    # Shared memory for data loading
+    - sharedarray
+    # Visualization and logging
+    - tensorboard
+    - tensorboardx
+
+tests:
+  - python:
+      imports:
+        - pointcept
+      pip_check: false
+  - script:
+      - python -c "import pointcept; print('Pointcept imported successfully')"
+
+about:
+  homepage: https://github.com/Pointcept/Pointcept
+  license: MIT
+  license_file: LICENSE
+  summary: Point Cloud Perception Framework for 3D understanding

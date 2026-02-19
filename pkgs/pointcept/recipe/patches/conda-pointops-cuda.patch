@@ -1,0 +1,34 @@
+diff --git a/libs/pointops/setup.py b/libs/pointops/setup.py
+--- a/libs/pointops/setup.py
++++ b/libs/pointops/setup.py
+@@ -2,8 +2,21 @@ import os
+ import glob
+ from setuptools import setup
+ from torch.utils.cpp_extension import BuildExtension, CUDAExtension
+-from distutils.sysconfig import get_config_vars
++import sysconfig
+
++# Conda build compatibility: ensure CUDA_HOME is set from conda environment
++def _setup_conda_cuda():
++    conda_prefix = os.environ.get("CONDA_PREFIX", os.environ.get("PREFIX", ""))
++    if conda_prefix:
++        if "CUDA_HOME" not in os.environ:
++            os.environ["CUDA_HOME"] = conda_prefix
++        # Also ensure nvcc can find the CUDA headers
++        cuda_include = os.path.join(conda_prefix, "include")
++        if os.path.exists(cuda_include):
++            os.environ.setdefault("CPATH", cuda_include)
++
++_setup_conda_cuda()
+
+ ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+ include_dirs = [os.path.join(ROOT_DIR, "include")]
+@@ -11,7 +24,7 @@ include_dirs = [os.path.join(ROOT_DIR, "include")]
+ sources = glob.glob(os.path.join(ROOT_DIR, "src", "*.cpp")) + glob.glob(
+     os.path.join(ROOT_DIR, "src", "*.cu")
+ )
+-(opt,) = get_config_vars("OPT")
++opt = sysconfig.get_config_var("OPT") or ""
+ os.environ["OPT"] = " ".join(
+     flag for flag in opt.split() if flag != "-Wstrict-prototypes"
+ )

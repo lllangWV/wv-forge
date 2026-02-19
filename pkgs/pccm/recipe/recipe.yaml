@@ -1,0 +1,50 @@
+# Recipe for pccm - Python C++ Code Manager
+# https://github.com/FindDefinition/PCCM
+
+context:
+  version: "0.4.16"
+
+package:
+  name: pccm
+  version: ${{ version }}
+
+source:
+  git: https://github.com/FindDefinition/PCCM.git
+  tag: v${{ version }}
+
+build:
+  number: 0
+  noarch: python
+  script: python -m pip install . -vv --no-deps --no-build-isolation
+
+requirements:
+  host:
+    - python >=3.9
+    - pip
+    - setuptools >=41.0
+    - wheel
+  run:
+    - python >=3.9
+    - ccimport >=0.3.1
+    - pybind11 >=2.6.0
+    - fire
+    - lark >=1.0.0
+    - portalocker >=2.3.2
+
+tests:
+  - python:
+      imports:
+        - pccm
+      pip_check: true
+  - script:
+      - python -c "import pccm; print('pccm imported successfully')"
+
+about:
+  homepage: https://github.com/FindDefinition/PCCM
+  license: MIT
+  license_file: LICENSE
+  summary: Python C++ Code Manager - A tool for generating and building C++ code from Python
+  description: |
+    PCCM is a Python C++ Code Manager that provides tools for generating
+    C++ code from Python, including decorators for class generation and
+    integration with pybind11 for Python bindings.

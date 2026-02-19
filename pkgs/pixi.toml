@@ -1,0 +1,70 @@
+# Main workspace for building Pointcept and its dependencies from source
+#
+# This workspace coordinates building the entire dependency chain:
+# ccimport (conda-forge) -> pccm -> cumm -> spconv -> pointcept
+#
+# Usage:
+#   pixi run build-pccm      # Build pccm first
+#   pixi run build-cumm      # Build cumm (requires pccm)
+#   pixi run build-spconv    # Build spconv (requires cumm)
+#   pixi run build-pointcept # Build pointcept (requires spconv)
+#   pixi run build-all       # Build entire chain in order
+
+[workspace]
+name = "pointcept-from-source"
+channels = ["conda-forge", "nvidia", "pytorch"]
+platforms = ["linux-64"]
+preview = ["pixi-build"]
+
+[dependencies]
+python = ">=3.10,<3.13"
+rattler-build = ">=0.35"
+
+[system-requirements]
+# Specify CUDA version requirement
+cuda = "12"
+
+[tasks]
+# Individual package builds
+build-pccm = { cmd = "cd pccm && pixi build", description = "Build pccm package" }
+build-cumm = { cmd = "cd cumm && pixi build", description = "Build cumm package (CUDA)" }
+build-spconv = { cmd = "cd spconv && pixi build", description = "Build spconv package (CUDA)" }
+build-pointcept = { cmd = "cd pointcept && pixi build", description = "Build pointcept package" }
+
+# Build all in dependency order
+build-all = { cmd = "pixi run build-pccm && pixi run build-cumm && pixi run build-spconv && pixi run build-pointcept", description = "Build all packages in order" }
+
+# Debug/development helpers
+debug-pccm = { cmd = "cd pccm && rattler-build debug --recipe recipe/recipe.yaml", description = "Setup pccm debug environment" }
+debug-cumm = { cmd = "cd cumm && rattler-build debug --recipe recipe/recipe.yaml", description = "Setup cumm debug environment" }
+debug-spconv = { cmd = "cd spconv && rattler-build debug --recipe recipe/recipe.yaml", description = "Setup spconv debug environment" }
+debug-pointcept = { cmd = "cd pointcept && rattler-build debug --recipe recipe/recipe.yaml", description = "Setup pointcept debug environment" }
+
+# Create patches from modifications
+create-patch-cumm = { cmd = "cd cumm && rattler-build create-patch --directory output/bld/rattler-build_cumm_*/work --name conda-fixes --patch-dir recipe/", description = "Create patch for cumm" }
+create-patch-spconv = { cmd = "cd spconv && rattler-build create-patch --directory output/bld/rattler-build_spconv_*/work --name conda-fixes --patch-dir recipe/", description = "Create patch for spconv" }
+create-patch-pointcept = { cmd = "cd pointcept && rattler-build create-patch --directory output/bld/rattler-build_pointcept_*/work --name conda-fixes --patch-dir recipe/", description = "Create patch for pointcept" }
+
+# Clean build artifacts
+clean = { cmd = "rm -rf */output */.pixi", description = "Clean all build artifacts" }
+
+[feature.cuda118]
+# Feature for building with CUDA 11.8
+[feature.cuda118.activation]
+env = { CUMM_CUDA_VERSION = "11.8", CUDA_VERSION = "11.8" }
+
+[feature.cuda124]
+# Feature for building with CUDA 12.4
+[feature.cuda124.activation]
+env = { CUMM_CUDA_VERSION = "12.4", CUDA_VERSION = "12.4" }
+
+[feature.cuda126]
+# Feature for building with CUDA 12.6
+[feature.cuda126.activation]
+env = { CUMM_CUDA_VERSION = "12.6", CUDA_VERSION = "12.6" }
+
+[environments]
+default = { features = ["cuda124"], solve-group = "default" }
+cuda118 = { features = ["cuda118"], solve-group = "cuda118" }
+cuda124 = { features = ["cuda124"], solve-group = "cuda124" }
+cuda126 = { features = ["cuda126"], solve-group = "cuda126" }

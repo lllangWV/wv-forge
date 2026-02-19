@@ -1,0 +1,25 @@
+diff --git a/setup.py b/setup.py
+--- a/setup.py
++++ b/setup.py
+@@ -1,5 +1,6 @@
+ import os
+ import sys
++import sysconfig
+ from pathlib import Path
+ from typing import List, Optional
+
+@@ -20,6 +21,14 @@ from pccm.extension import ExtCallback, PCCMBuild, PCCMExtension
+
+ from cumm.constants import PACKAGE_NAME
+
++# Conda build compatibility: set CUDA paths from conda environment
++def _setup_conda_cuda_paths():
++    conda_prefix = os.environ.get("CONDA_PREFIX", os.environ.get("PREFIX", ""))
++    if conda_prefix and "CUDA_HOME" not in os.environ:
++        os.environ["CUDA_HOME"] = conda_prefix
++
++_setup_conda_cuda_paths()
++
+
+ def _convert_build_number(build: str):
+     major, minor = build.split(".")

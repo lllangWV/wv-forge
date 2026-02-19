@@ -1,0 +1,18 @@
+[workspace]
+name = "pointcept"
+channels = ["conda-forge", "nvidia", "pytorch"]
+platforms = ["linux-64"]
+preview = ["pixi-build"]
+
+[dependencies]
+pointcept = { path = "." }
+
+[package]
+name = "pointcept"
+version = "1.6.0"
+
+[package.build]
+backend = { name = "pixi-build-rattler-build", version = "*", channels = ["https://prefix.dev/pixi-build-backends", "conda-forge", "nvidia", "pytorch"] }
+
+[package.build.source]
+path = "recipe"

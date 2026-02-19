@@ -1,0 +1,78 @@
+# Recipe for cumm - CUDA Matrix Multiply library
+# https://github.com/FindDefinition/cumm
+
+context:
+  version: "0.7.11"
+
+package:
+  name: cumm
+  version: ${{ version }}
+
+source:
+  git: https://github.com/FindDefinition/cumm.git
+  tag: v${{ version }}
+
+build:
+  number: 0
+  script:
+    env:
+      CUMM_DISABLE_JIT: "1"
+      CUMM_CUDA_VERSION: "12.6"
+      CUMM_CUDA_ARCH_LIST: "7.0;7.5;8.0;8.6;8.9;9.0"
+    content: |
+      export CUDA_HOME=$PREFIX
+      $PYTHON -m pip install . -vv --no-deps --no-build-isolation
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+    - ${{ compiler('cxx') }}
+    - cmake
+    - ninja
+  host:
+    - python >=3.10,<3.13
+    - pip
+    - setuptools >=41.0
+    - wheel
+    - pccm >=0.4.15
+    - ccimport >=0.4.4
+    - pybind11 >=2.6.0
+    - numpy
+    - sympy
+    - fire
+    - cuda-version 12.6.*
+    - cuda-cudart-dev
+    - cuda-nvcc
+    - libcublas-dev
+    - libcurand-dev
+    - cuda-nvrtc-dev
+    - cuda-profiler-api
+    - libcusparse-dev
+  run:
+    - python >=3.10,<3.13
+    - pccm >=0.4.15
+    - ccimport >=0.4.4
+    - pybind11 >=2.6.0
+    - numpy
+    - sympy
+    - fire
+    - cuda-version >=12.6,<12.7
+    - cuda-cudart >=12.6,<12.7
+    - cuda-nvrtc >=12.6,<12.7
+    - libcublas >=12.6,<12.7
+    - libcurand >=10.3.7,<10.4
+    - libcusparse >=12.5,<12.6
+
+tests:
+  - python:
+      imports:
+        - cumm
+      pip_check: true
+  - script:
+      - python -c "import cumm; print('cumm imported successfully')"
+
+about:
+  homepage: https://github.com/FindDefinition/cumm
+  license: Apache-2.0
+  license_file: LICENSE
+  summary: CUDA Matrix Multiply library with Python bindings
