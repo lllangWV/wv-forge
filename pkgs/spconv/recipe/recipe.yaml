@@ -11,13 +11,20 @@ package:
 source:
   git: https://github.com/traveller59/spconv.git
   tag: v${{ version }}
+  patches:
+    - patches/conda-cuda-boost-paths.patch
 
 build:
   number: 0
+  skip:
+    - not linux
+  variant:
+    use_keys:
+      - cuda_version
   script:
     env:
       SPCONV_DISABLE_JIT: "1"
-      CUMM_CUDA_VERSION: "12.6"
+      CUMM_CUDA_VERSION: "${{ cuda_version }}"
       CUMM_CUDA_ARCH_LIST: "7.0;7.5;8.0;8.6;8.9;9.0"
     content: |
       export CUDA_HOME=$PREFIX
@@ -31,7 +38,7 @@ requirements:
     - cmake
     - ninja
   host:
-    - python >=3.10,<3.13
+    - python
     - pip
     - setuptools >=41.0
     - wheel
@@ -41,7 +48,7 @@ requirements:
     - numpy
     - fire
     - cumm >=0.7.11,<0.8.0
-    - cuda-version 12.6.*
+    - cuda-version
     - cuda-cudart-dev
     - cuda-nvcc
     - libcublas-dev
@@ -51,29 +58,40 @@ requirements:
     - libcusparse-dev
     - libboost-devel >=1.77.0
   run:
-    - python >=3.10,<3.13
+    - ${{ pin_compatible('python', upper_bound='x.x') }}
     - pccm >=0.4.16
     - ccimport >=0.4.4
     - numpy
     - fire
     - cumm >=0.7.11,<0.8.0
-    - cuda-version >=12.6,<12.7
-    - cuda-cudart >=12.6,<12.7
-    - cuda-nvrtc >=12.6,<12.7
-    - libcublas >=12.6,<12.7
-    - libcurand >=10.3.7,<10.4
-    - libcusparse >=12.5,<12.6
+    - ${{ pin_compatible('cuda-version', lower_bound='x.x', upper_bound='x') }}
+    - cuda-cudart
+    - ${{ pin_compatible('cuda-nvrtc', lower_bound='x.x', upper_bound='x.x') }}
+    - libcublas
+    - libcurand
+    - libcusparse
+  ignore_run_exports:
+    from_package:
+      - cuda-cudart-dev
+      - libcublas-dev
+      - libcurand-dev
+      - cuda-nvrtc-dev
+      - libcusparse-dev
+    by_name:
+      - cuda-version
 
 tests:
   - python:
       imports:
         - spconv
       pip_check: false
-  - script:
-      - python -c "import spconv; print('spconv imported successfully')"
 
 about:
   homepage: https://github.com/traveller59/spconv
   license: Apache-2.0
   license_file: LICENSE
   summary: Spatial Sparse Convolution Library for 3D point cloud processing
+
+extra:
+  recipe-maintainers:
+    - lllangWV

@@ -1,3 +1,6 @@
+# Recipe for SAM 3D Objects - 3D object generation from Meta FAIR
+# https://github.com/facebookresearch/sam-3d-objects
+
 context:
   version: "0.0.1"
 
@@ -10,21 +13,20 @@ source:
 
 build:
   number: 0
-  skip:
-    - not linux
+  noarch: python
   script:
     content: |
-      ${PYTHON} -m pip install . -vv --no-deps --no-build-isolation
+      ${{ PYTHON }} -m pip install . -vv --no-deps --no-build-isolation
 
 requirements:
   host:
-    - python 3.12.*
+    - python >=3.12
     - pip
     - hatchling
     - hatch-requirements-txt
   run:
+    - python >=3.12
     # Core
-    - python 3.12.*
     - pytorch-gpu >=2.8.0,<2.10.0
     - torchvision
     - numpy
@@ -32,7 +34,6 @@ requirements:
     - tqdm
     - loguru
     - scipy
-
     # Config / training
     - omegaconf
     - hydra-core
@@ -40,7 +41,6 @@ requirements:
     - safetensors
     - optree
     - timm
-
     # 3D / geometry
     - pytorch3d
     - gsplat
@@ -51,23 +51,19 @@ requirements:
     - pyvista
     - pymeshfix
     - python-igraph
-
     # Visualization
     - matplotlib
     - plotly
     - seaborn
     - imageio
     - opencv
-
     # Attention backends
     - flash-attn
-
     # Mono depth / misc 3D
     - utils3d
     - xatlas-python
     - moge
     - pipeline
-
     # Misc
     - astor
     - easydict
@@ -75,14 +71,15 @@ requirements:
 
 tests:
   - script:
-      - LIDRA_SKIP_INIT=1 ${PYTHON} -c "import sam3d_objects"
+      - LIDRA_SKIP_INIT=1 ${{ PYTHON }} -c "import sam3d_objects"
 
 about:
   homepage: https://github.com/facebookresearch/sam-3d-objects
   license: Apache-2.0
   license_file: LICENSE
   summary: SAM 3D Objects - 3D object generation from Meta FAIR
-  description: |
-    SAM 3D Objects provides models and pipelines for generating
-    3D objects using diffusion-based approaches with PyTorch3D.
   repository: https://github.com/facebookresearch/sam-3d-objects
+
+extra:
+  recipe-maintainers:
+    - lllangWV

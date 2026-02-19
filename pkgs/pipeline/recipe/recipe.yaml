@@ -1,3 +1,6 @@
+# Recipe for pipeline - Multithreaded Python data pipeline framework
+# https://github.com/EasternJournalist/pipeline
+
 context:
   version: "1.0.0"
   commit: "866f059d2a05cde05e4a52211ec5051fd5f276d6"
@@ -15,7 +18,7 @@ build:
   noarch: python
   script:
     content: |
-      ${PYTHON} -m pip install . -vv --no-deps --no-build-isolation
+      ${{ PYTHON }} -m pip install . -vv --no-deps --no-build-isolation
 
 requirements:
   host:
@@ -37,3 +40,7 @@ about:
   license_file: LICENSE
   summary: A multithreaded Python framework for building concurrent data pipelines
   repository: https://github.com/EasternJournalist/pipeline
+
+extra:
+  recipe-maintainers:
+    - lllangWV

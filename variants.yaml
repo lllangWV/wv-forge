@@ -1,0 +1,17 @@
+# variants.yaml — build matrix for wv-forge packages
+# rattler-build reads this file via -m flag to expand recipes into multiple builds.
+#
+# Usage:
+#   rattler-build build -r <recipe> -m variants.yaml -c conda-forge -c nvidia
+#
+# This produces a cross-product: 2 Python x 3 CUDA = 6 variants per CUDA package.
+# Noarch packages should use --ignore-recipe-variants to skip this matrix.
+
+python:
+  - "3.12"
+  - "3.13"
+
+cuda_version:
+  - "12.6"
+  - "12.8"
+  - "12.9"

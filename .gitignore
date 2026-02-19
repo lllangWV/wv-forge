@@ -1,6 +1,7 @@
 .env
 output/
 pixi.lock
+.build_marker
 
 .claude/
 .pixi/

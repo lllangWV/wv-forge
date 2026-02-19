@@ -15,7 +15,7 @@ source:
 build:
   number: 0
   noarch: python
-  script: python -m pip install . -vv --no-deps --no-build-isolation
+  script: ${{ PYTHON }} -m pip install . -vv --no-deps --no-build-isolation
 
 requirements:
   host:
@@ -36,15 +36,13 @@ tests:
       imports:
         - pccm
       pip_check: true
-  - script:
-      - python -c "import pccm; print('pccm imported successfully')"
 
 about:
   homepage: https://github.com/FindDefinition/PCCM
   license: MIT
   license_file: LICENSE
   summary: Python C++ Code Manager - A tool for generating and building C++ code from Python
-  description: |
-    PCCM is a Python C++ Code Manager that provides tools for generating
-    C++ code from Python, including decorators for class generation and
-    integration with pybind11 for Python bindings.
+
+extra:
+  recipe-maintainers:
+    - lllangWV

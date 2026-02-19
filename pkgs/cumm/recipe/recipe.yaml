@@ -11,13 +11,20 @@ package:
 source:
   git: https://github.com/FindDefinition/cumm.git
   tag: v${{ version }}
+  patches:
+    - patches/conda-cuda-paths.patch
 
 build:
   number: 0
+  skip:
+    - not linux
+  variant:
+    use_keys:
+      - cuda_version
   script:
     env:
       CUMM_DISABLE_JIT: "1"
-      CUMM_CUDA_VERSION: "12.6"
+      CUMM_CUDA_VERSION: "${{ cuda_version }}"
       CUMM_CUDA_ARCH_LIST: "7.0;7.5;8.0;8.6;8.9;9.0"
     content: |
       export CUDA_HOME=$PREFIX
@@ -30,7 +37,7 @@ requirements:
     - cmake
     - ninja
   host:
-    - python >=3.10,<3.13
+    - python
     - pip
     - setuptools >=41.0
     - wheel
@@ -40,7 +47,7 @@ requirements:
     - numpy
     - sympy
     - fire
-    - cuda-version 12.6.*
+    - cuda-version
     - cuda-cudart-dev
     - cuda-nvcc
     - libcublas-dev
@@ -49,30 +56,41 @@ requirements:
     - cuda-profiler-api
     - libcusparse-dev
   run:
-    - python >=3.10,<3.13
+    - ${{ pin_compatible('python', upper_bound='x.x') }}
     - pccm >=0.4.15
     - ccimport >=0.4.4
     - pybind11 >=2.6.0
     - numpy
     - sympy
     - fire
-    - cuda-version >=12.6,<12.7
-    - cuda-cudart >=12.6,<12.7
-    - cuda-nvrtc >=12.6,<12.7
-    - libcublas >=12.6,<12.7
-    - libcurand >=10.3.7,<10.4
-    - libcusparse >=12.5,<12.6
+    - ${{ pin_compatible('cuda-version', lower_bound='x.x', upper_bound='x') }}
+    - cuda-cudart
+    - ${{ pin_compatible('cuda-nvrtc', lower_bound='x.x', upper_bound='x.x') }}
+    - libcublas
+    - libcurand
+    - libcusparse
+  ignore_run_exports:
+    from_package:
+      - cuda-cudart-dev
+      - libcublas-dev
+      - libcurand-dev
+      - cuda-nvrtc-dev
+      - libcusparse-dev
+    by_name:
+      - cuda-version
 
 tests:
   - python:
       imports:
         - cumm
       pip_check: true
-  - script:
-      - python -c "import cumm; print('cumm imported successfully')"
 
 about:
   homepage: https://github.com/FindDefinition/cumm
   license: Apache-2.0
   license_file: LICENSE
   summary: CUDA Matrix Multiply library with Python bindings
+
+extra:
+  recipe-maintainers:
+    - lllangWV

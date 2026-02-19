@@ -1,3 +1,6 @@
+# Recipe for MoGe - Monocular Geometry Estimation
+# https://github.com/microsoft/MoGe
+
 context:
   version: "2.0.0"
   commit: "07444410f1e33f402353b99d6ccd26bd31e469e8"
@@ -15,7 +18,7 @@ build:
   noarch: python
   script:
     content: |
-      ${PYTHON} -m pip install . -vv --no-deps --no-build-isolation
+      ${{ PYTHON }} -m pip install . -vv --no-deps --no-build-isolation
 
 requirements:
   host:
@@ -50,3 +53,7 @@ about:
   license_file: LICENSE
   summary: "MoGe: Unlocking Accurate Monocular Geometry Estimation for Open-Domain Images"
   repository: https://github.com/microsoft/MoGe
+
+extra:
+  recipe-maintainers:
+    - lllangWV
