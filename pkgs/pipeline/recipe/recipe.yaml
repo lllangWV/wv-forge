@@ -1,0 +1,39 @@
+context:
+  version: "1.0.0"
+  commit: "866f059d2a05cde05e4a52211ec5051fd5f276d6"
+
+package:
+  name: pipeline
+  version: ${{ version }}
+
+source:
+  url: https://github.com/EasternJournalist/pipeline/archive/${{ commit }}.tar.gz
+  sha256: 36e2fc484c98ff4b9e007457ab45b71009434e9834992336bd2efda22f532523
+
+build:
+  number: 0
+  noarch: python
+  script:
+    content: |
+      ${PYTHON} -m pip install . -vv --no-deps --no-build-isolation
+
+requirements:
+  host:
+    - python >=3.8
+    - pip
+    - setuptools >=61.0
+    - wheel
+  run:
+    - python >=3.8
+
+tests:
+  - python:
+      imports:
+        - pipeline
+
+about:
+  homepage: https://github.com/EasternJournalist/pipeline
+  license: MIT
+  license_file: LICENSE
+  summary: A multithreaded Python framework for building concurrent data pipelines
+  repository: https://github.com/EasternJournalist/pipeline

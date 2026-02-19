@@ -1,0 +1,24 @@
+[workspace]
+channels = ["https://prefix.dev/conda-forge"]
+platforms = ["linux-64"]
+preview = ["pixi-build"]
+
+[system-requirements]
+cuda = "12.9"
+
+[dependencies]
+moge = { path = "recipe" }
+utils3d = { path = "../utils3d" }
+pipeline = { path = "../pipeline" }
+python = "3.12.*"
+
+[package]
+name = "moge"
+version = "0.1.0"
+
+[package.build]
+backend = { name = "pixi-build-rattler-build", version = "0.3.*" }
+
+[package.run-dependencies]
+utils3d = { path = "../utils3d" }
+pipeline = { path = "../pipeline" }

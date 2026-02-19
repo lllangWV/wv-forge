@@ -1,0 +1,71 @@
+context:
+  version: "0.7.9"
+
+package:
+  name: pytorch3d
+  version: ${{ version }}
+
+source:
+  url: https://github.com/facebookresearch/pytorch3d/archive/v${{ version }}.tar.gz
+  sha256: 96c1ef357c522e1f45b5f9c27bae9b75185034457ddbcacdd343a0ec50bc515f
+
+build:
+  number: 0
+  skip:
+    - not linux
+  script:
+    env:
+      FORCE_CUDA: "1"
+      TORCH_CUDA_ARCH_LIST: "5.0;6.0;6.1;7.0;7.5;8.0;8.6;9.0+PTX"
+      MAX_JOBS: "${CPU_COUNT}"
+    content: |
+      ${PYTHON} -m pip install . -vv --no-build-isolation
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+    - ${{ compiler('cxx') }}
+  host:
+    - python 3.12.*
+    - pip
+    - setuptools
+    - ninja
+    - numpy
+    - pytorch-gpu >=2.8.0,<2.10.0
+    - cuda-version >=12.6
+    - cuda-nvcc
+    - cuda-cccl
+    - cuda-cudart-dev
+    - libcusparse-dev
+    - libcusolver-dev
+    - libcublas-dev
+  run:
+    - python 3.12.*
+    - pytorch-gpu >=2.8.0,<2.10.0
+    - ${{ pin_compatible('cuda-version', upper_bound='x', lower_bound='x') }}
+    - iopath
+    - fvcore
+    - numpy
+
+tests:
+  - python:
+      imports:
+        - pytorch3d
+        - pytorch3d.structures
+        - pytorch3d.renderer
+        - pytorch3d.ops
+        - pytorch3d.loss
+        - pytorch3d.io
+
+about:
+  homepage: https://github.com/facebookresearch/pytorch3d
+  license: BSD-3-Clause
+  license_file: LICENSE
+  summary: PyTorch3D is FAIR's library of reusable components for deep learning with 3D data
+  description: |
+    PyTorch3D provides efficient, reusable components for 3D Computer Vision
+    research with PyTorch. Key features include a modular differentiable
+    renderer, support for batched 3D mesh and pointcloud operations, and
+    efficient graph convolution operations.
+  repository: https://github.com/facebookresearch/pytorch3d
+  documentation: https://pytorch3d.org/

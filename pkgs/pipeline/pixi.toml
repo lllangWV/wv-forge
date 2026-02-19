@@ -1,0 +1,15 @@
+[workspace]
+channels = ["https://prefix.dev/conda-forge"]
+platforms = ["linux-64"]
+preview = ["pixi-build"]
+
+[dependencies]
+pipeline = { path = "recipe" }
+python = "3.12.*"
+
+[package]
+name = "pipeline"
+version = "0.1.0"
+
+[package.build]
+backend = { name = "pixi-build-rattler-build", version = "0.3.*" }

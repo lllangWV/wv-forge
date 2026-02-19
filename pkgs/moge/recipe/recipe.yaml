@@ -1,0 +1,52 @@
+context:
+  version: "2.0.0"
+  commit: "07444410f1e33f402353b99d6ccd26bd31e469e8"
+
+package:
+  name: moge
+  version: ${{ version }}
+
+source:
+  url: https://github.com/microsoft/MoGe/archive/${{ commit }}.tar.gz
+  sha256: 08e5fcbaa4421a0e3e284ac7e3196965904677bb479c29b19c95ead47407f734
+
+build:
+  number: 0
+  noarch: python
+  script:
+    content: |
+      ${PYTHON} -m pip install . -vv --no-deps --no-build-isolation
+
+requirements:
+  host:
+    - python >=3.9
+    - pip
+    - setuptools >=61.0
+    - wheel
+  run:
+    - python >=3.9
+    - click
+    - opencv
+    - scipy
+    - matplotlib
+    - trimesh
+    - pillow
+    - huggingface_hub
+    - numpy
+    - pytorch-gpu >=2.0.0
+    - torchvision
+    - gradio
+    - utils3d
+    - pipeline
+
+tests:
+  - python:
+      imports:
+        - moge
+
+about:
+  homepage: https://github.com/microsoft/MoGe
+  license: MIT
+  license_file: LICENSE
+  summary: "MoGe: Unlocking Accurate Monocular Geometry Estimation for Open-Domain Images"
+  repository: https://github.com/microsoft/MoGe
