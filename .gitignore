@@ -4,3 +4,5 @@ pixi.lock
 
 .claude/
 .pixi/
+# agdex
+.agdex/
