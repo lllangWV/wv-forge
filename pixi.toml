@@ -21,41 +21,6 @@ upload-all = "python scripts/upload_to_prefix.py --all"
 upload-force = "python scripts/upload_to_prefix.py --all --force"
 build-cloudcompare = "rattler-build build -r src/cloudcompare/recipe.yaml -c conda-forge"
 
-[feature.cumm.system-requirements]
-cuda = "12.6"
-[feature.cumm.dependencies]
-cumm = "*"
-cuda-version = "12.6.*"
-spconv = "*"
-pytorch3d = "*"
-sam3d-objects = "*"
-moge = "*"
-pccm = "*"
-pointcept = "*"
-
-
-
-[feature.sam3d.system-requirements]
-cuda = "12.6"
-[feature.sam3d.dependencies]
-python = "==3.12.12"
-cumm = "*"
-cuda-version = "12.6.*"
-spconv = "*"
-pytorch3d = {version = "*",channel = "https://prefix.dev/wv-forge"}
-sam3d-objects = "*"
-moge = "*"
-pccm = "*"
-gsplat = "*"
-kaolin = "*"
-# open3d = "*"
-flash-attn = "*"
-xatlas-python = "*"
-
-[feature.sam3d.pypi-dependencies]
-open3d = "*"
-
-
 
 
 [feature.python.dependencies]
@@ -77,15 +42,25 @@ networkx = "2.4.*"
 rattler-build-conda-compat = ">=1.2.0,<2.0.0a0"
 
 [feature.build.tasks.build]
-description = "build for all platforms"
-cmd = "python build_locally.py"
+description = "Build packages in Docker with rattler-build (default: --all)"
+cmd = "python build_locally.py {{ flags }}"
+args = [{ arg = "flags", default = "--all" }]
+
+[feature.build.tasks.build-noarch]
+description = "Build only noarch packages in Docker"
+depends-on = [{ task = "build", args = ["--noarch-only"] }]
+
+[feature.build.tasks.build-variant]
+description = "Build only CUDA variant packages in Docker"
+depends-on = [{ task = "build", args = ["--variant-only"] }]
 
 [feature.linux]
 # The linux feature runs on every platform that can run Docker.
 platforms = ["linux-64", "linux-aarch64", "osx-64", "osx-arm64", "win-64"]
 [feature.linux.tasks.build-linux]
-description = "build for Linux inside a docker container"
-cmd = "python build_locally.py --filter 'linux*'"
+description = "Build packages in Docker with rattler-build (default: --all)"
+cmd = "python build_locally.py {{ flags }}"
+args = [{ arg = "flags", default = "--all" }]
 
 [feature.osx]
 # The osx env will run directly on the machine.
@@ -136,8 +111,8 @@ platforms = ["linux-64", "linux-aarch64", "osx-64", "osx-arm64", "win-64"]
 dependencies.shellcheck = ">=0.10.0"
 
 [environments]
-cumm = { features = ["cumm"], solve-group = "cumm" }
-sam3d = { features = ["sam3d"], solve-group = "sam3d" }
+# cumm = { features = ["cumm"], solve-group = "cumm" }
+# sam3d = { features = ["sam3d"], solve-group = "sam3d" }
 # linux only needs Python to run build-locally.py. Everything else happens in Docker.
 linux = ["linux", "python"]
 # osx and win do run natively on the machine, so we need the build deps too
@@ -146,3 +121,44 @@ win = ["win", "python", "build"]
 build = ["python", "build"]
 grayskull = ["python", "grayskull"]
 conda-smithy = ["python", "conda-smithy", "shellcheck"]
+
+
+
+
+
+# [feature.cumm]
+# platforms = ["linux-64"]
+# system-requirements = { cuda = "12.6" }
+
+# [feature.cumm.dependencies]
+# cumm = "*"
+# cuda-version = "12.6.*"
+# spconv = "*"
+# pytorch3d = "*"
+# sam3d-objects = "*"
+# moge = "*"
+# pccm = "*"
+# pointcept = "*"
+
+
+# [feature.sam3d]
+# platforms = ["linux-64"]
+# system-requirements = { cuda = "12.6" }
+
+# [feature.sam3d.dependencies]
+# python = "==3.12.12"
+# cumm = "*"
+# cuda-version = "12.6.*"
+# spconv = "*"
+# pytorch3d = {version = "*",channel = "https://prefix.dev/wv-forge"}
+# sam3d-objects = "*"
+# moge = "*"
+# pccm = "*"
+# gsplat = "*"
+# kaolin = "*"
+# # open3d = "*"
+# flash-attn = "*"
+# xatlas-python = "*"
+
+# [feature.sam3d.pypi-dependencies]
+# open3d = "*"

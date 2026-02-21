@@ -1,133 +1,325 @@
+#!/usr/bin/env python3
+"""
+build_locally.py -- Build wv-forge conda packages in Docker with rattler-build.
 
-#!/bin/sh
-"""exec" "python3" "$0" "$@" #"""  # fmt: off # fmt: on
-# The line above this comment is a bash / sh / zsh guard
-# to stop people from running it with the wrong interpreter
+Usage:
+    python build_locally.py                    # Interactive package selection
+    python build_locally.py --all              # Build all packages
+    python build_locally.py -p cumm spconv     # Build specific packages
+    python build_locally.py --noarch-only      # Build only noarch packages
+    python build_locally.py --variant-only     # Build only variant (CUDA) packages
+    python build_locally.py --dry-run          # Show Docker command without running
 
-import glob
+Packages are built inside a Docker container using the conda-forge alma9 image.
+Output goes to ./output/ (mounted from host). sccache is enabled by default
+with the host's ~/.cache/sccache mounted into the container for persistence.
+"""
+
 import os
-import platform
+import re
 import subprocess
 import sys
 from argparse import ArgumentParser
-from subprocess import check_output
+from dataclasses import dataclass
+from pathlib import Path
+
+DOCKER_IMAGE_DEFAULT = "quay.io/condaforge/linux-anvil-x86_64:alma9"
+CONTAINER_REPO = "/home/conda/wv-forge"
+CONTAINER_SCRIPT = f"{CONTAINER_REPO}/.scripts/run_rattler_build.sh"
+
+# Colors
+GREEN = "\033[0;32m"
+YELLOW = "\033[1;33m"
+RED = "\033[0;31m"
+CYAN = "\033[0;36m"
+BOLD = "\033[1m"
+NC = "\033[0m"
 
 
-def verify_system():
-    branch_name = check_output(
-        ["git", "rev-parse", "--abbrev-ref", "HEAD"], text=True
-    ).strip()
-    # if branch_name == "main":
-    #     raise RuntimeError(
-    #         "You should run build-locally from a new branch, not 'main'. "
-    #         "Create a new one with:\n\n"
-    #         "    git checkout -b your-chosen-branch-name\n"
-    #     )
+@dataclass
+class Package:
+    name: str
+    recipe_dir: str  # Relative to repo root, e.g. "pkgs/cumm/recipe"
+    build_type: str  # "noarch", "variant", or "standard"
 
 
-def setup_environment(ns):
-    os.environ["CONFIG"] = ns.config
-    os.environ["UPLOAD_PACKAGES"] = "False"
-    os.environ["IS_PR_BUILD"] = "True"
-    if ns.debug:
-        os.environ["BUILD_WITH_CONDA_DEBUG"] = "1"
-        if ns.output_id:
-            os.environ["BUILD_OUTPUT_ID"] = ns.output_id
-    if "MINIFORGE_HOME" not in os.environ:
-        os.environ["MINIFORGE_HOME"] = os.path.join(
-            os.path.dirname(__file__), "miniforge3"
-        )
-    if "OSX_SDK_DIR" not in os.environ:
-        os.environ["OSX_SDK_DIR"] = os.path.join(os.path.dirname(__file__), "SDKs")
+def discover_packages(repo_root: Path) -> list[Package]:
+    """Scan pkgs/ for recipe.yaml files and detect build type."""
+    pkgs_dir = repo_root / "pkgs"
+    packages = []
 
-    # The default cache location might not be writable using docker on macOS.
-    if ns.config.startswith("linux") and platform.system() == "Darwin":
-        os.environ["CONDA_FORGE_DOCKER_RUN_ARGS"] = (
-            "-e RATTLER_CACHE_DIR=/tmp/rattler_cache"
-        )
+    for entry in sorted(pkgs_dir.iterdir()):
+        if not entry.is_dir():
+            continue
 
+        # Check for recipe/recipe.yaml first, then recipe.yaml at top level
+        recipe_path = entry / "recipe" / "recipe.yaml"
+        if recipe_path.exists():
+            recipe_dir = str((entry / "recipe").relative_to(repo_root))
+        else:
+            recipe_path = entry / "recipe.yaml"
+            if recipe_path.exists():
+                recipe_dir = str(entry.relative_to(repo_root))
+            else:
+                continue
 
-def run_docker_build(ns):
-    script = ".scripts/run_docker_build.sh"
-    subprocess.check_call([script])
+        build_type = detect_build_type(recipe_path)
+        packages.append(Package(name=entry.name, recipe_dir=recipe_dir, build_type=build_type))
 
-
-def run_osx_build(ns):
-    script = ".scripts/run_osx_build.sh"
-    subprocess.check_call([script])
+    return packages
 
 
-def run_win_build(ns):
-    script = ".scripts/run_win_build.bat"
-    subprocess.check_call(["cmd", "/D", "/Q", "/C", f"CALL {script}"])
+def detect_build_type(recipe_path: Path) -> str:
+    """Detect build type from recipe.yaml contents."""
+    content = recipe_path.read_text()
+
+    # Check for noarch in build section
+    if re.search(r"^\s+noarch:", content, re.MULTILINE):
+        return "noarch"
+
+    # Check for variant config with cuda_version
+    if "cuda_version" in content:
+        return "variant"
+
+    return "standard"
 
 
-def verify_config(ns):
-    choices_filter = ns.filter or "*"
-    valid_configs = {
-        os.path.basename(f)[:-5]
-        for f in glob.glob(f".ci_support/{choices_filter}.yaml")
+def interactive_select(packages: list[Package]) -> list[Package]:
+    """Present numbered list grouped by type and get user selection."""
+    groups = {"noarch": [], "variant": [], "standard": []}
+    for pkg in packages:
+        groups[pkg.build_type].append(pkg)
+
+    # Build ordered display list
+    display = []
+    group_labels = {
+        "noarch": f"{CYAN}Noarch packages:{NC}",
+        "variant": f"{CYAN}Variant packages (CUDA):{NC}",
+        "standard": f"{CYAN}Standard packages:{NC}",
     }
-    if choices_filter != "*":
-        print(f"filtering for '{choices_filter}.yaml' configs")
-    print(f"valid configs are {valid_configs}")
-    if ns.config in valid_configs:
-        print("Using " + ns.config + " configuration")
-        return
-    elif len(valid_configs) == 1:
-        ns.config = valid_configs.pop()
-        print("Found " + ns.config + " configuration")
-    elif ns.config is None:
-        print("config not selected, please choose from the following:\n")
-        selections = list(enumerate(sorted(valid_configs), 1))
-        for i, c in selections:
-            print(f"{i}. {c}")
-        try:
-            s = input("\n> ")
-        except KeyboardInterrupt:
-            print("\nno option selected, bye!", file=sys.stderr)
+
+    for build_type in ("noarch", "variant", "standard"):
+        if groups[build_type]:
+            display.append(("header", group_labels[build_type]))
+            for pkg in groups[build_type]:
+                display.append(("pkg", pkg))
+
+    print(f"\n{BOLD}=== wv-forge Local Builder ==={NC}\n")
+
+    idx = 0
+    index_map = {}  # 1-based index -> Package
+    for item_type, item in display:
+        if item_type == "header":
+            print(f"  {item}")
+        else:
+            idx += 1
+            index_map[idx] = item
+            print(f"    {idx:>2}. {item.name}")
+
+    print(f"\n  {BOLD}Shortcuts:{NC} 'all', 'noarch', 'variant', 'standard'")
+    print(f"  {BOLD}Examples:{NC}  '1,3,6-8' or 'all'\n")
+
+    try:
+        selection = input(f"  Select packages > ").strip()
+    except (KeyboardInterrupt, EOFError):
+        print("\n\nAborted.")
+        sys.exit(1)
+
+    if not selection:
+        print("No selection made.")
+        sys.exit(1)
+
+    # Handle keyword shortcuts
+    if selection.lower() == "all":
+        return packages
+    if selection.lower() in ("noarch", "variant", "standard"):
+        return [p for p in packages if p.build_type == selection.lower()]
+
+    # Parse numeric selection
+    indices = parse_selection(selection, idx)
+    selected = []
+    for i in indices:
+        if i in index_map:
+            selected.append(index_map[i])
+        else:
+            print(f"{RED}Invalid index: {i}{NC}", file=sys.stderr)
             sys.exit(1)
-        idx = int(s) - 1
-        ns.config = selections[idx][1]
-        print(f"selected {ns.config}")
+
+    return selected
+
+
+def parse_selection(selection: str, total: int) -> list[int]:
+    """Parse '1,3,6-8' into list of 1-based indices."""
+    indices = []
+    for part in selection.split(","):
+        part = part.strip()
+        if "-" in part:
+            start, end = part.split("-", 1)
+            start, end = int(start.strip()), int(end.strip())
+            indices.extend(range(start, end + 1))
+        else:
+            indices.append(int(part))
+    return indices
+
+
+def build_docker_command(
+    packages: list[Package],
+    repo_root: Path,
+    docker_image: str,
+    no_sccache: bool,
+) -> list[str]:
+    """Construct the docker run command."""
+    # Encode package specs as semicolon-delimited "type:name:container_recipe_dir"
+    specs = []
+    for pkg in packages:
+        container_recipe = f"{CONTAINER_REPO}/{pkg.recipe_dir}"
+        specs.append(f"{pkg.build_type}:{pkg.name}:{container_recipe}")
+    package_spec_string = ";".join(specs)
+
+    output_dir = repo_root / "output"
+    sccache_dir = Path.home() / ".cache" / "sccache"
+    rattler_cache_dir = Path.home() / ".cache" / "rattler"
+
+    cmd = ["docker", "run", "--rm"]
+
+    # Add -it only when stdin is a TTY
+    if sys.stdin.isatty():
+        cmd.append("-it")
+
+    # Mount repo read-only
+    cmd.extend(["-v", f"{repo_root}:{CONTAINER_REPO}:ro"])
+
+    # Mount output directory read-write (overlays the ro mount)
+    cmd.extend(["-v", f"{output_dir}:{CONTAINER_REPO}/output"])
+
+    # Mount rattler cache for repodata caching across builds
+    cmd.extend(["-v", f"{rattler_cache_dir}:/home/conda/.cache/rattler"])
+
+    # Mount sccache cache
+    if not no_sccache:
+        cmd.extend(["-v", f"{sccache_dir}:/home/conda/.cache/sccache"])
+
+    # Environment variables
+    cmd.extend(["-e", f"BUILD_PACKAGES={package_spec_string}"])
+    cmd.extend(["-e", f"SCCACHE_ENABLED={'0' if no_sccache else '1'}"])
+    cmd.extend(["-e", f"HOST_USER_ID={os.getuid()}"])
+
+    # Image and command
+    cmd.append(docker_image)
+    cmd.extend(["bash", CONTAINER_SCRIPT])
+
+    return cmd
+
+
+def main():
+    parser = ArgumentParser(
+        description="Build wv-forge conda packages in Docker with rattler-build"
+    )
+    parser.add_argument(
+        "--packages", "-p", nargs="+", metavar="PKG",
+        help="Package names to build (non-interactive)",
+    )
+    parser.add_argument(
+        "--all", action="store_true",
+        help="Build all packages",
+    )
+    parser.add_argument(
+        "--noarch-only", action="store_true",
+        help="Build only noarch packages",
+    )
+    parser.add_argument(
+        "--variant-only", action="store_true",
+        help="Build only variant (CUDA) packages",
+    )
+    parser.add_argument(
+        "--no-sccache", action="store_true",
+        help="Disable sccache",
+    )
+    parser.add_argument(
+        "--docker-image", default=DOCKER_IMAGE_DEFAULT,
+        help=f"Docker image to use (default: {DOCKER_IMAGE_DEFAULT})",
+    )
+    parser.add_argument(
+        "--dry-run", "-n", action="store_true",
+        help="Print the docker command without running it",
+    )
+
+    args = parser.parse_args()
+    repo_root = Path(__file__).resolve().parent
+
+    # Discover packages
+    packages = discover_packages(repo_root)
+    if not packages:
+        print(f"{RED}No packages found in pkgs/{NC}", file=sys.stderr)
+        sys.exit(1)
+
+    # Select packages
+    if args.all:
+        selected = packages
+    elif args.noarch_only:
+        selected = [p for p in packages if p.build_type == "noarch"]
+    elif args.variant_only:
+        selected = [p for p in packages if p.build_type == "variant"]
+    elif args.packages:
+        pkg_names = set(args.packages)
+        selected = [p for p in packages if p.name in pkg_names]
+        unknown = pkg_names - {p.name for p in selected}
+        if unknown:
+            print(f"{RED}Unknown packages: {', '.join(sorted(unknown))}{NC}", file=sys.stderr)
+            print(f"Available: {', '.join(p.name for p in packages)}", file=sys.stderr)
+            sys.exit(1)
     else:
-        raise ValueError("config " + ns.config + " is not valid")
-    if ns.config.startswith("osx") and platform.system() == "Darwin":
-        if "OSX_SDK_DIR" not in os.environ:
-            raise RuntimeError(
-                "Need OSX_SDK_DIR env variable set. Run 'export OSX_SDK_DIR=/opt'"
-                "to download the SDK automatically to '/opt/MacOSX<ver>.sdk'"
-            )
+        selected = interactive_select(packages)
 
+    if not selected:
+        print("No packages selected.")
+        sys.exit(0)
 
-def main(args=None):
-    p = ArgumentParser("build-locally")
-    p.add_argument("config", default=None, nargs="?")
-    p.add_argument(
-        "--filter",
-        default=None,
-        help="Glob string to filter which build choices are presented in interactive mode.",
-    )
-    p.add_argument(
-        "--debug",
-        action="store_true",
-        help="Setup debug environment using `conda debug`",
-    )
-    p.add_argument("--output-id", help="If running debug, specify the output to setup.")
+    # Show what will be built
+    print(f"\n{GREEN}Building {len(selected)} package(s):{NC}")
+    for pkg in selected:
+        print(f"  - {pkg.name} ({pkg.build_type})")
+    print()
 
-    ns = p.parse_args(args=args)
-    verify_system()
-    verify_config(ns)
-    setup_environment(ns)
+    # Ensure host directories exist
+    output_dir = repo_root / "output"
+    output_dir.mkdir(exist_ok=True)
+    rattler_cache_dir = Path.home() / ".cache" / "rattler"
+    rattler_cache_dir.mkdir(parents=True, exist_ok=True)
+    if not args.no_sccache:
+        sccache_dir = Path.home() / ".cache" / "sccache"
+        sccache_dir.mkdir(parents=True, exist_ok=True)
 
-    # if ns.config.startswith("linux") or (
-    #     ns.config.startswith("osx") and platform.system() == "Linux"
-    # ):
-    #     run_docker_build(ns)
-    # elif ns.config.startswith("osx"):
-    #     run_osx_build(ns)
-    # elif ns.config.startswith("win"):
-    #     run_win_build(ns)
+    # Build Docker command
+    cmd = build_docker_command(selected, repo_root, args.docker_image, args.no_sccache)
+
+    if args.dry_run:
+        print(f"{YELLOW}[DRY RUN] Docker command:{NC}")
+        # Pretty-print the command with line continuations
+        print("  docker run \\")
+        # Skip "docker" and "run", format the rest
+        i = 2
+        while i < len(cmd):
+            arg = cmd[i]
+            if arg in ("-v", "-e", "-it", "--rm"):
+                if i + 1 < len(cmd) and not cmd[i + 1].startswith("-"):
+                    print(f"    {arg} {cmd[i + 1]} \\")
+                    i += 2
+                else:
+                    print(f"    {arg} \\")
+                    i += 1
+            else:
+                if i == len(cmd) - 1:
+                    print(f"    {arg}")
+                else:
+                    print(f"    {arg} \\")
+                i += 1
+        sys.exit(0)
+
+    # Run Docker build
+    print(f"{GREEN}Launching Docker build...{NC}\n")
+    result = subprocess.run(cmd)
+    sys.exit(result.returncode)
 
 
 if __name__ == "__main__":
