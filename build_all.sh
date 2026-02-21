@@ -139,7 +139,8 @@ echo ""
 # ────────────────────────────────────────────
 build_level "0 - Base (noarch)" \
   "noarch:pccm:$REPO_ROOT/pkgs/pccm/recipe" \
-  "noarch:pipeline:$REPO_ROOT/pkgs/pipeline/recipe"
+  "noarch:pipeline:$REPO_ROOT/pkgs/pipeline/recipe" \
+  "noarch:utils3d:$REPO_ROOT/pkgs/utils3d/recipe"
 
 # ────────────────────────────────────────────
 # Level 1: cumm (CUDA variants, depends on pccm)
@@ -154,11 +155,12 @@ build_level "2 - spconv" \
   "variant:spconv:$REPO_ROOT/pkgs/spconv/recipe"
 
 # ────────────────────────────────────────────
-# Level 3: pointcept + pytorch3d (independent, CUDA variants)
+# Level 3: pointcept + pytorch3d + open3d (independent, CUDA variants)
 # ────────────────────────────────────────────
-build_level "3 - pointcept + pytorch3d" \
+build_level "3 - pointcept + pytorch3d + open3d" \
   "variant:pointcept:$REPO_ROOT/pkgs/pointcept/recipe" \
-  "variant:pytorch3d:$REPO_ROOT/pkgs/pytorch3d/recipe"
+  "variant:pytorch3d:$REPO_ROOT/pkgs/pytorch3d/recipe" \
+  "variant:open3d:$REPO_ROOT/pkgs/open3d/recipe"
 
 # ────────────────────────────────────────────
 # Level 4: moge (noarch, depends on pipeline)

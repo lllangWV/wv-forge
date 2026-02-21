@@ -1,0 +1,177 @@
+# Recipe for Open3D - 3D Data Processing Library with CUDA + Open3D-ML (PyTorch)
+# Converted from conda-forge meta.yaml to rattler-build recipe.yaml
+# https://github.com/isl-org/Open3D
+
+context:
+  name: open3d
+  version: "0.19.0"
+
+package:
+  name: ${{ name }}
+  version: ${{ version }}
+
+source:
+  - url: https://github.com/isl-org/Open3D/archive/v${{ version }}.tar.gz
+    sha256: 5cedb0e093c6baceab801b903eb8e2558bc2b3999ac57762bf78a39d5e15394a
+    patches:
+      - patches/fix-unzip.patch
+      - patches/fix-curl.patch
+      - patches/fix-error.patch
+      - patches/fix-find-imgui.patch
+      - patches/7249.patch
+      - patches/fix-gcc15-cstdint.patch
+  - url: https://github.com/isl-org/Open3D-ML/archive/v${{ version }}.tar.gz
+    sha256: 419d1986f4513af0a1209eb946fd6c4249d1eaba88a0da29f83109429a854f6c
+    target_directory: open3d_ml
+
+build:
+  number: 0
+  skip:
+    - not linux
+  script: build.sh
+  variant:
+    use_keys:
+      - cuda_version
+  python:
+    entry_points:
+      - open3d = open3d.tools.cli:main
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+    - ${{ compiler('cxx') }}
+    - cmake
+    - make
+    - pkg-config
+    - git
+    - libgomp
+  host:
+    - python
+    - pip
+    - setuptools
+    - yapf
+    # CUDA
+    - cuda-version
+    - cuda-nvcc
+    - cuda-cudart-dev
+    - cuda-cccl
+    - libcublas-dev
+    - libcurand-dev
+    - libcusolver-dev
+    - libcusparse-dev
+    - libnpp-dev
+    - cuda-nvrtc-dev
+    - cuda-profiler-api
+    # PyTorch (for Open3D-ML PyTorch ops)
+    - pytorch-gpu >=2.2.0
+    # OpenGL / X11
+    - libgl-devel
+    - libglx-devel
+    - libopengl-devel
+    - xorg-libxdamage
+    - xorg-libxfixes
+    - libxcb
+    # Core C++ deps (system-provided via USE_SYSTEM_*=ON)
+    - assimp
+    - libzlib
+    - eigen
+    - embree
+    - glew
+    - glfw
+    - fmt
+    - libjpeg-turbo
+    - gmock
+    - jsoncpp
+    - zeromq
+    - cppzmq
+    - msgpack-c
+    - msgpack-cxx
+    - minizip
+    - vtk
+    - qt6-main
+    - libpng
+    - pybind11
+    - pybind11-abi
+    - qhull
+    - qhull-static
+    - tinyobjloader
+    - libcblas
+    - liblapacke
+    - blas-devel
+    - nomkl
+    - libboost-headers
+    - nanoflann
+    - liblzf
+    - libcurl
+    - tbb-devel
+  run:
+    - python
+    - numpy
+    - libopenblas
+    - scikit-learn
+    - pyyaml
+    - pandas
+    - scipy
+    - tqdm
+    - joblib
+    - addict
+    - pillow
+    - plotly
+    - dash
+    - ${{ pin_compatible('pytorch-gpu', upper_bound='x.x') }}
+    # CUDA Enhanced Compatibility: pin to major version only
+    - ${{ pin_compatible('cuda-version', lower_bound='x.x', upper_bound='x') }}
+    - cuda-cudart
+    - libcublas
+    - libcurand
+    - libcusolver
+    - libcusparse
+    - libnpp
+    - ${{ pin_compatible('cuda-nvrtc', lower_bound='x.x', upper_bound='x.x') }}
+  run_exports:
+    weak:
+      - ${{ pin_subpackage('open3d', upper_bound='x.x.x') }}
+  ignore_run_exports:
+    from_package:
+      # Original feedstock suppressions (libcblas NOT suppressed: needed for libopenblas at runtime)
+      - minizip
+      - msgpack-c
+      - msgpack-cxx
+      # CUDA Enhanced Compatibility: suppress tight version pins from -dev packages
+      - cuda-cudart-dev
+      - libcublas-dev
+      - libcurand-dev
+      - libcusolver-dev
+      - libcusparse-dev
+      - libnpp-dev
+      - cuda-nvrtc-dev
+    by_name:
+      - cuda-version
+
+tests:
+  - python:
+      imports:
+        - open3d
+      pip_check: false
+  - script:
+      - open3d --help
+      - python -c "import open3d; print('CUDA available:', open3d.core.cuda.is_available())"
+
+about:
+  homepage: http://www.open3d.org/
+  summary: Open-source library for 3D data processing with CUDA and Open3D-ML (PyTorch ops)
+  license: MIT
+  license_file:
+    - LICENSE
+    - 3rdparty/uvatlas/LICENSE_directxheaders
+    - 3rdparty/uvatlas/LICENSE_directxmath
+    - 3rdparty/uvatlas/LICENSE_uvatlas
+    - 3rdparty/possionrecon/LICENSE
+    - 3rdparty/rply/LICENSE
+    - 3rdparty/tinyfiledialogs/LICENSE
+    - 3rdparty/tinygltf/LICENSE
+  repository: https://github.com/isl-org/Open3D
+
+extra:
+  recipe-maintainers:
+    - lllangWV

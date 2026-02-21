@@ -1,0 +1,12 @@
+diff --git a/cpp/open3d/core/SmallVector.h b/cpp/open3d/core/SmallVector.h
+index 1234567..abcdefg 100644
+--- a/cpp/open3d/core/SmallVector.h
++++ b/cpp/open3d/core/SmallVector.h
+@@ -28,6 +28,7 @@
+ #include <algorithm>
+ #include <cassert>
+ #include <cstddef>
++#include <cstdint>
+ #include <cstdlib>
+ #include <cstring>
+ #include <functional>
