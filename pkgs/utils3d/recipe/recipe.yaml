@@ -1,0 +1,49 @@
+# Recipe for utils3d - 3D computer vision and graphics utilities
+# https://github.com/EasternJournalist/utils3d
+
+context:
+  version: "1.3"
+  commit: "3fab839f0be9931dac7c8488eb0e1600c236e183"
+
+package:
+  name: utils3d
+  version: ${{ version }}
+
+source:
+  url: https://github.com/EasternJournalist/utils3d/archive/${{ commit }}.tar.gz
+  sha256: f1f167b1f68809bea391a66dd0d2ad0e14f7382cbddf087b655181c31a285abb
+
+build:
+  number: 0
+  noarch: python
+  script:
+    content: |
+      ${{ PYTHON }} -m pip install . -vv --no-deps --no-build-isolation
+
+requirements:
+  host:
+    - python >=3.7
+    - pip
+    - setuptools
+  run:
+    - python >=3.7
+    - moderngl
+    - numpy
+    - scipy
+    - matplotlib
+
+tests:
+  - python:
+      imports:
+        - utils3d
+
+about:
+  homepage: https://github.com/EasternJournalist/utils3d
+  license: MIT
+  license_file: LICENSE
+  summary: A collection of useful functions for 3D computer vision and graphics
+  repository: https://github.com/EasternJournalist/utils3d
+
+extra:
+  recipe-maintainers:
+    - lllangWV
