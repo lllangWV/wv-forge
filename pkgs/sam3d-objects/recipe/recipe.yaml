@@ -3,13 +3,15 @@
 
 context:
   version: "0.0.1"
+  commit: "81a82373a3a7f4cbb00bd5b32aaf6b4d0f659ddd"
 
 package:
   name: sam3d-objects
   version: ${{ version }}
 
 source:
-  path: ..
+  url: https://github.com/facebookresearch/sam-3d-objects/archive/${{ commit }}.tar.gz
+  sha256: 6dda92acee2397369daeb56572ba4db043f7ad62b6eb269de5af1dfd647d7641
 
 build:
   number: 0
@@ -27,7 +29,7 @@ requirements:
   run:
     - python >=3.12
     # Core
-    - pytorch-gpu >=2.8.0,<2.10.0
+    - pytorch-gpu >=2.6.0
     - torchvision
     - numpy
     - pillow
@@ -43,10 +45,7 @@ requirements:
     - timm
     # 3D / geometry
     - pytorch3d
-    - gsplat
-    - open3d
     - trimesh
-    - kaolin
     - plyfile
     - pyvista
     - pymeshfix
@@ -57,21 +56,24 @@ requirements:
     - seaborn
     - imageio
     - opencv
-    # Attention backends
-    - flash-attn
     # Mono depth / misc 3D
     - utils3d
-    - xatlas-python
     - moge
     - pipeline
     # Misc
     - astor
     - easydict
     - huggingface_hub
+    # 3D / GPU acceleration
+    - gsplat
+    - kaolin
+    - open3d
+    - flash-attn
+    - xatlas-python
 
 tests:
   - script:
-      - LIDRA_SKIP_INIT=1 ${{ PYTHON }} -c "import sam3d_objects"
+      - LIDRA_SKIP_INIT=1 python -c "import sam3d_objects"
 
 about:
   homepage: https://github.com/facebookresearch/sam-3d-objects

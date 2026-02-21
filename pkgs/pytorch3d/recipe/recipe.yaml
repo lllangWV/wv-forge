@@ -37,7 +37,7 @@ requirements:
     - setuptools
     - ninja
     - numpy
-    - pytorch-gpu >=2.8.0,<2.10.0
+    - pytorch-gpu >=2.6.0
     - cuda-version
     - cuda-nvcc
     - cuda-cccl
@@ -47,7 +47,7 @@ requirements:
     - libcublas-dev
   run:
     - ${{ pin_compatible('python', upper_bound='x.x') }}
-    - pytorch-gpu >=2.8.0,<2.10.0
+    - ${{ pin_compatible('pytorch-gpu', upper_bound='x.x') }}
     - ${{ pin_compatible('cuda-version', lower_bound='x.x', upper_bound='x') }}
     - cuda-cudart
     - iopath

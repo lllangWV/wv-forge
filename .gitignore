@@ -7,3 +7,5 @@ pixi.lock
 .pixi/
 # agdex
 .agdex/
+
+tmp/

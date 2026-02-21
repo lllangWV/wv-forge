@@ -1,7 +1,7 @@
 [workspace]
 name = "rattler-packages"
-channels = ["conda-forge"]
-platforms = ["linux-64", "osx-arm64", "win-64"]
+channels = ["https://prefix.dev/wv-forge", "conda-forge"]
+platforms = ["linux-64"]
 
 [dependencies]
 python = ">=3.11"
@@ -16,3 +16,41 @@ upload = "python scripts/upload_to_prefix.py"
 upload-all = "python scripts/upload_to_prefix.py --all"
 upload-force = "python scripts/upload_to_prefix.py --all --force"
 build-cloudcompare = "rattler-build build -r src/cloudcompare/recipe.yaml -c conda-forge"
+
+[feature.cumm.system-requirements]
+cuda = "12.6"
+[feature.cumm.dependencies]
+cumm = "*"
+cuda-version = "12.6.*"
+spconv = "*"
+pytorch3d = "*"
+sam3d-objects = "*"
+moge = "*"
+pccm = "*"
+pointcept = "*"
+
+
+
+[feature.sam3d.system-requirements]
+cuda = "12.6"
+[feature.sam3d.dependencies]
+python = "==3.12.12"
+cumm = "*"
+cuda-version = "12.6.*"
+spconv = "*"
+pytorch3d = {version = "*",channel = "https://prefix.dev/wv-forge"}
+sam3d-objects = "*"
+moge = "*"
+pccm = "*"
+gsplat = "*"
+kaolin = "*"
+# open3d = "*"
+flash-attn = "*"
+xatlas-python = "*"
+
+[feature.sam3d.pypi-dependencies]
+open3d = "*"
+
+[environments]
+cumm = { features = ["cumm"], solve-group = "cumm" }
+sam3d = { features = ["sam3d"], solve-group = "sam3d" }

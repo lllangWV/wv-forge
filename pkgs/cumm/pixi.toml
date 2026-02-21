@@ -1,12 +1,15 @@
 [workspace]
 name = "cumm"
 channels = [
-  "file:///home/lllang/Documents/ykkap_xtech-Notebook/01_Projects/YKK-Point-Cloud/ext_pkgs/pccm/.pixi/build/work/pccm-g0iKkfNOTTk-TwLmj22Yeao/output",
+  "file:///home/lllang/Documents/lllangWV-Projects/wv-forge/pkgs/pccm/.pixi/build/work/pccm-g0iKkfNOTTk-TwLmj22Yeao/output",
   "conda-forge",
   "nvidia"
 ]
 platforms = ["linux-64"]
 preview = ["pixi-build"]
+
+[system-requirements]
+cuda = "12.6"
 
 [dependencies]
 cumm = { path = "." }
