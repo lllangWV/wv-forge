@@ -6,6 +6,7 @@
 #   BUILD_PACKAGES    - Semicolon-delimited "type:name:recipe_dir" specs
 #   SCCACHE_ENABLED   - "1" to enable sccache, "0" to disable
 #   HOST_USER_ID      - UID of the host user (for output file ownership)
+#   BUILD_JOBS        - Max parallel compilation jobs (unset = all cores)
 
 set -euo pipefail
 
@@ -62,7 +63,27 @@ else
 fi
 
 # ─────────────────────────────────────────────
-# 3. Build each package
+# 3. Limit compilation parallelism
+# ─────────────────────────────────────────────
+if [ -n "${BUILD_JOBS:-}" ]; then
+    log_info "Limiting compilation to $BUILD_JOBS parallel job(s)"
+    export CPU_COUNT="$BUILD_JOBS"
+    export CMAKE_BUILD_PARALLEL_LEVEL="$BUILD_JOBS"
+    export MAKEFLAGS="-j$BUILD_JOBS"
+fi
+
+# ─────────────────────────────────────────────
+# 4. Override virtual packages for GPU-less builds
+# ─────────────────────────────────────────────
+# The __cuda virtual package represents the system CUDA driver. Since we build
+# inside Docker without a GPU, we must tell the solver to assume a driver is
+# present. This allows packages that depend on __cuda (e.g. pytorch-gpu) to
+# resolve. The value should be >= the highest cuda_version in variants.yaml.
+export CONDA_OVERRIDE_CUDA="${CONDA_OVERRIDE_CUDA:-12.9}"
+log_info "CONDA_OVERRIDE_CUDA=${CONDA_OVERRIDE_CUDA}"
+
+# ─────────────────────────────────────────────
+# 5. Build each package
 # ─────────────────────────────────────────────
 mkdir -p "$OUTPUT_DIR"
 
@@ -128,7 +149,7 @@ for pkg_spec in "${PACKAGES[@]}"; do
 done
 
 # ─────────────────────────────────────────────
-# 4. Fix output file ownership
+# 6. Fix output file ownership
 # ─────────────────────────────────────────────
 if [ -n "${HOST_USER_ID:-}" ] && [ "$HOST_USER_ID" != "0" ]; then
     log_info "Fixing output file ownership (uid=$HOST_USER_ID)..."
@@ -136,7 +157,7 @@ if [ -n "${HOST_USER_ID:-}" ] && [ "$HOST_USER_ID" != "0" ]; then
 fi
 
 # ─────────────────────────────────────────────
-# 5. Report
+# 7. Report
 # ─────────────────────────────────────────────
 if [ "${SCCACHE_ENABLED:-1}" = "1" ]; then
     echo ""

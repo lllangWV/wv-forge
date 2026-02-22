@@ -8,7 +8,9 @@ Usage:
     python build_locally.py -p cumm spconv     # Build specific packages
     python build_locally.py --noarch-only      # Build only noarch packages
     python build_locally.py --variant-only     # Build only variant (CUDA) packages
-    python build_locally.py --dry-run          # Show Docker command without running
+    python build_locally.py --clean             # Remove built outputs, then rebuild all
+    python build_locally.py --clean -p cumm     # Clean and rebuild specific packages
+    python build_locally.py --dry-run           # Show Docker command without running
 
 Packages are built inside a Docker container using the conda-forge alma9 image.
 Output goes to ./output/ (mounted from host). sccache is enabled by default
@@ -17,6 +19,7 @@ with the host's ~/.cache/sccache mounted into the container for persistence.
 
 import os
 import re
+import shutil
 import subprocess
 import sys
 from argparse import ArgumentParser
@@ -84,7 +87,61 @@ def detect_build_type(recipe_path: Path) -> str:
     return "standard"
 
 
-def interactive_select(packages: list[Package]) -> list[Package]:
+def get_variant_count(repo_root: Path) -> int:
+    """Count expected variant builds from variants.yaml (product of all list lengths)."""
+    variants_file = repo_root / "variants.yaml"
+    if not variants_file.exists():
+        return 1
+    lists = []
+    current_count = 0
+    for line in variants_file.read_text().splitlines():
+        stripped = line.strip()
+        if stripped.startswith("#") or not stripped:
+            continue
+        if stripped.startswith("- "):
+            current_count += 1
+        elif stripped.endswith(":"):
+            if current_count > 0:
+                lists.append(current_count)
+            current_count = 0
+    if current_count > 0:
+        lists.append(current_count)
+    result = 1
+    for n in lists:
+        result *= n
+    return result
+
+
+def is_package_built(pkg: Package, output_dir: Path, variant_count: int) -> bool:
+    """Check if a package already has build outputs in the output directory.
+
+    For noarch/standard packages, checks for at least one matching .conda file.
+    For variant packages, checks that all expected variants are present.
+    """
+    if pkg.build_type == "noarch":
+        subdir = output_dir / "noarch"
+    else:
+        subdir = output_dir / "linux-64"
+
+    if not subdir.exists():
+        return False
+
+    matches = list(subdir.glob(f"{pkg.name}-*.conda"))
+    if pkg.build_type == "variant":
+        return len(matches) >= variant_count
+    return len(matches) >= 1
+
+
+def clean_output(output_dir: Path):
+    """Remove built package outputs (preserves src_cache and bld for faster rebuilds)."""
+    for subdir_name in ("linux-64", "noarch", "broken"):
+        subdir = output_dir / subdir_name
+        if subdir.exists():
+            shutil.rmtree(subdir)
+            print(f"  Removed {subdir}")
+
+
+def interactive_select(packages: list[Package], output_dir: Path, variant_count: int) -> list[Package]:
     """Present numbered list grouped by type and get user selection."""
     groups = {"noarch": [], "variant": [], "standard": []}
     for pkg in packages:
@@ -114,7 +171,9 @@ def interactive_select(packages: list[Package]) -> list[Package]:
         else:
             idx += 1
             index_map[idx] = item
-            print(f"    {idx:>2}. {item.name}")
+            built = is_package_built(item, output_dir, variant_count)
+            status = f" {GREEN}(built){NC}" if built else ""
+            print(f"    {idx:>2}. {item.name}{status}")
 
     print(f"\n  {BOLD}Shortcuts:{NC} 'all', 'noarch', 'variant', 'standard'")
     print(f"  {BOLD}Examples:{NC}  '1,3,6-8' or 'all'\n")
@@ -167,6 +226,7 @@ def build_docker_command(
     repo_root: Path,
     docker_image: str,
     no_sccache: bool,
+    jobs: int | None = None,
 ) -> list[str]:
     """Construct the docker run command."""
     # Encode package specs as semicolon-delimited "type:name:container_recipe_dir"
@@ -203,6 +263,13 @@ def build_docker_command(
     cmd.extend(["-e", f"BUILD_PACKAGES={package_spec_string}"])
     cmd.extend(["-e", f"SCCACHE_ENABLED={'0' if no_sccache else '1'}"])
     cmd.extend(["-e", f"HOST_USER_ID={os.getuid()}"])
+    cmd.extend(["-e", f"BUILD_JOBS={jobs}"])
+
+    # Forward CONDA_OVERRIDE_CUDA so the solver can resolve __cuda deps in
+    # GPU-less Docker builds.  run_rattler_build.sh defaults to 12.9 when unset.
+    cuda_override = os.environ.get("CONDA_OVERRIDE_CUDA")
+    if cuda_override:
+        cmd.extend(["-e", f"CONDA_OVERRIDE_CUDA={cuda_override}"])
 
     # Image and command
     cmd.append(docker_image)
@@ -232,6 +299,14 @@ def main():
         help="Build only variant (CUDA) packages",
     )
     parser.add_argument(
+        "--clean", action="store_true",
+        help="Remove built outputs and rebuild from scratch",
+    )
+    parser.add_argument(
+        "--jobs", "-j", type=int, default=28, metavar="N",
+        help="Max parallel compilation jobs (default: 28)",
+    )
+    parser.add_argument(
         "--no-sccache", action="store_true",
         help="Disable sccache",
     )
@@ -246,12 +321,28 @@ def main():
 
     args = parser.parse_args()
     repo_root = Path(__file__).resolve().parent
+    output_dir = repo_root / "output"
+    variant_count = get_variant_count(repo_root)
 
     # Discover packages
     packages = discover_packages(repo_root)
     if not packages:
         print(f"{RED}No packages found in pkgs/{NC}", file=sys.stderr)
         sys.exit(1)
+
+    # Handle --clean: remove built outputs before selecting
+    if args.clean:
+        if args.dry_run:
+            print(f"\n{YELLOW}[DRY RUN] Would clean built outputs from:{NC}")
+            for subdir_name in ("linux-64", "noarch", "broken"):
+                subdir = output_dir / subdir_name
+                if subdir.exists():
+                    print(f"  {subdir}")
+            print()
+        else:
+            print(f"\n{YELLOW}Cleaning built outputs...{NC}")
+            clean_output(output_dir)
+            print()
 
     # Select packages
     if args.all:
@@ -269,11 +360,32 @@ def main():
             print(f"Available: {', '.join(p.name for p in packages)}", file=sys.stderr)
             sys.exit(1)
     else:
-        selected = interactive_select(packages)
+        selected = interactive_select(packages, output_dir, variant_count)
 
     if not selected:
         print("No packages selected.")
         sys.exit(0)
+
+    # Skip already-built packages (unless --clean already wiped them)
+    if not args.clean:
+        to_build = []
+        skipped = []
+        for pkg in selected:
+            if is_package_built(pkg, output_dir, variant_count):
+                skipped.append(pkg)
+            else:
+                to_build.append(pkg)
+
+        if skipped:
+            print(f"\n{YELLOW}Skipping {len(skipped)} already-built package(s):{NC}")
+            for pkg in skipped:
+                print(f"  - {pkg.name} ({pkg.build_type})")
+
+        selected = to_build
+
+        if not selected:
+            print(f"\n{GREEN}All selected packages are already built. Use --clean to rebuild.{NC}")
+            sys.exit(0)
 
     # Show what will be built
     print(f"\n{GREEN}Building {len(selected)} package(s):{NC}")
@@ -282,7 +394,6 @@ def main():
     print()
 
     # Ensure host directories exist
-    output_dir = repo_root / "output"
     output_dir.mkdir(exist_ok=True)
     rattler_cache_dir = Path.home() / ".cache" / "rattler"
     rattler_cache_dir.mkdir(parents=True, exist_ok=True)
@@ -291,7 +402,7 @@ def main():
         sccache_dir.mkdir(parents=True, exist_ok=True)
 
     # Build Docker command
-    cmd = build_docker_command(selected, repo_root, args.docker_image, args.no_sccache)
+    cmd = build_docker_command(selected, repo_root, args.docker_image, args.no_sccache, args.jobs)
 
     if args.dry_run:
         print(f"{YELLOW}[DRY RUN] Docker command:{NC}")

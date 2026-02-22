@@ -61,8 +61,9 @@ docker run ${DOCKER_RUN_ARGS} \
            -e AZURE=${AZURE} \
            -e CONFIG \
            -e CI \
-           -e CPU_COUNT \
+           -e CPU_COUNT="${BUILD_JOBS:-28}" \
            -e DEFAULT_LINUX_VERSION \
+           -e CONDA_OVERRIDE_CUDA="${CONDA_OVERRIDE_CUDA:-12.9}" \
            "${DOCKER_IMAGE}" \
            bash \
            "/home/conda/staged-recipes/${PROVIDER_DIR}/build_steps.sh"

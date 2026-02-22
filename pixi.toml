@@ -46,6 +46,10 @@ description = "Build packages in Docker with rattler-build (default: --all)"
 cmd = "python build_locally.py {{ flags }}"
 args = [{ arg = "flags", default = "--all" }]
 
+[feature.build.tasks.build-clean]
+description = "Clean built outputs and rebuild all packages from scratch"
+depends-on = [{ task = "build", args = ["--clean"] }]
+
 [feature.build.tasks.build-noarch]
 description = "Build only noarch packages in Docker"
 depends-on = [{ task = "build", args = ["--noarch-only"] }]
