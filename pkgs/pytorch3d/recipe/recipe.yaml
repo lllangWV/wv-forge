@@ -23,10 +23,29 @@ build:
   script:
     env:
       FORCE_CUDA: "1"
-      TORCH_CUDA_ARCH_LIST: "7.0;7.5;8.0;8.6;8.9;9.0+PTX"
+      TORCH_CUDA_ARCH_LIST: ${{ "5.0;6.0;7.0;7.5;8.0;8.6;9.0;10.0;12.0+PTX" if cuda_version >= "12.8" else "5.0;6.0;7.0;7.5;8.0;8.6;9.0+PTX" }}
       MAX_JOBS: "${CPU_COUNT}"
     content: |
+      export CUDA_HOME=$PREFIX
+      export CUB_HOME=$PREFIX/include
+
+      # Wrap CC/CXX with sccache via scripts so nvcc -ccbin gets a valid path
+      mkdir -p /tmp/sccache-wrappers
+      printf '#!/bin/bash\nexec sccache %s "$@"\n' "$CC"  > /tmp/sccache-wrappers/sccache-cc
+      printf '#!/bin/bash\nexec sccache %s "$@"\n' "$CXX" > /tmp/sccache-wrappers/sccache-cxx
+      chmod +x /tmp/sccache-wrappers/sccache-cc /tmp/sccache-wrappers/sccache-cxx
+      export CC=/tmp/sccache-wrappers/sccache-cc
+      export CXX=/tmp/sccache-wrappers/sccache-cxx
+
       $PYTHON -m pip install . -vv --no-build-isolation
+  dynamic_linking:
+    missing_dso_allowlist:
+      - "**/libc10.so"
+      - "**/libc10_cuda.so"
+      - "**/libtorch.so"
+      - "**/libtorch_cpu.so"
+      - "**/libtorch_cuda.so"
+      - "**/libtorch_python.so"
 
 requirements:
   build:
@@ -39,6 +58,7 @@ requirements:
     - ninja
     - numpy
     - pytorch-gpu >=2.6.0
+    - cudnn
     - cuda-version
     - cuda-nvcc
     - cuda-cccl
@@ -50,6 +70,7 @@ requirements:
     - ${{ pin_compatible('python', upper_bound='x.x') }}
     - ${{ pin_compatible('pytorch-gpu', upper_bound='x.x') }}
     - ${{ pin_compatible('cuda-version', lower_bound='x.x', upper_bound='x') }}
+    - ${{ pin_compatible('cudnn') }}
     - cuda-cudart
     - iopath
     - fvcore
