@@ -78,6 +78,7 @@ requirements:
       - libcurand-dev
       - cuda-nvrtc-dev
       - libcusparse-dev
+      - libboost-devel
     by_name:
       - cuda-version
 
