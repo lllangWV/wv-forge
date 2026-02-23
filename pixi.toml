@@ -16,10 +16,12 @@ platforms = [
 
 
 [tasks]
-upload = "python scripts/upload_to_prefix.py"
-upload-all = "python scripts/upload_to_prefix.py --all"
-upload-force = "python scripts/upload_to_prefix.py --all --force"
 build-cloudcompare = "rattler-build build -r src/cloudcompare/recipe.yaml -c conda-forge"
+
+[tasks.upload]
+description = "Upload packages to prefix.dev (skips already-uploaded by default)"
+cmd = "python scripts/upload_to_prefix.py {{ flags }}"
+args = [{ arg = "flags", default = "--all" }]
 
 
 

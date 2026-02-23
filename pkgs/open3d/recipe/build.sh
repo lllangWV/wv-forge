@@ -3,10 +3,23 @@ set -euxo pipefail
 export QT_HOST_PATH="$PREFIX"
 export CUDA_HOME="$PREFIX"
 
+# Patch sysroot libc.so linker script: replace absolute paths with =-prefixed
+# paths so GNU ld prepends the sysroot even when invoked by nvcc (which doesn't
+# pass --sysroot to the linker).
+# Before: GROUP ( /lib64/libc.so.6 /usr/lib64/libc_nonshared.a ... )
+# After:  GROUP ( =/lib64/libc.so.6 =/usr/lib64/libc_nonshared.a ... )
+for _sysroot in "${BUILD_PREFIX}/x86_64-conda-linux-gnu/sysroot" \
+                "${PREFIX}/x86_64-conda-linux-gnu/sysroot"; do
+    _libc_so="${_sysroot}/usr/lib64/libc.so"
+    if [ -f "${_libc_so}" ]; then
+        sed -i 's| /lib64/| =/lib64/|g; s| /usr/lib64/| =/usr/lib64/|g' "${_libc_so}"
+    fi
+done
+
 # Open3D's CMake uses ExternalProject_Add with GIT_REPOSITORY for Open3D-ML,
 # so it expects a git repo. Initialize the extracted source as one.
 pushd ${SRC_DIR}/open3d_ml
-git init
+git init -b main
 git add .
 git -c user.email="build@local" -c user.name="build" commit -m "v${PKG_VERSION}"
 git tag "v${PKG_VERSION}"
@@ -92,4 +105,19 @@ for lib in libOpen3D.so.0.19 open3d_torch_ops.so; do
         rm "$SITE_CUDA/$lib"
         ln -s "$REL_PREFIX/$lib" "$SITE_CUDA/$lib"
     fi
+done
+
+# Create open3d/cpu/ as a mirror of open3d/cuda/ so that open3d.__init__.py
+# can fall back to CPU imports when no CUDA device is available at runtime.
+# A CUDA build only produces open3d/cuda/pybind*.so, but __init__.py
+# unconditionally does "from open3d.cpu.pybind import ..." when it can't
+# detect a GPU (e.g. in Docker test environments without drivers).
+# The CUDA-built pybind .so contains all CPU symbols, so symlinking works.
+SITE_CPU="$SP_DIR/open3d/cpu"
+mkdir -p "$SITE_CPU"
+touch "$SITE_CPU/__init__.py"
+for so in "$SITE_CUDA"/pybind*.so; do
+    [ -f "$so" ] || continue
+    soname=$(basename "$so")
+    ln -s "../cuda/$soname" "$SITE_CPU/$soname"
 done

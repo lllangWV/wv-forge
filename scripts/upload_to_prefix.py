@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-Upload conda packages to prefix.dev channel.
+Upload conda packages to prefix.dev channel, skipping packages already on the channel.
 
 Usage:
     # Create a .env file with your API token
-    echo 'PREFIX_API_TOKEN=pfx_your_token_here' > .env
+    echo 'PREFIX_API_KEY=pfx_your_token_here' > .env
 
     # Upload a single package
     pixi run upload output/linux-64/cloudcompare-2.13.2-hb0f4dca_0.conda
 
-    # Upload all packages in output directory
+    # Upload all packages not already on the channel
     pixi run upload-all
 
     # Force overwrite existing packages
@@ -31,6 +31,7 @@ load_dotenv()
 # Default channel - change this to your channel name
 DEFAULT_CHANNEL = "wv-forge"
 PREFIX_API_BASE = "https://prefix.dev/api/v1"
+PREFIX_CHANNEL_BASE = "https://prefix.dev"
 
 
 def get_token() -> str:
@@ -40,6 +41,28 @@ def get_token() -> str:
         print("Error: PREFIX_API_KEY not found")
         sys.exit(1)
     return token
+
+
+def get_remote_packages(channel: str, subdir: str) -> set[str]:
+    """Fetch the set of package filenames already on the remote channel for a given subdir."""
+    url = f"{PREFIX_CHANNEL_BASE}/{channel}/{subdir}/repodata.json"
+    try:
+        response = requests.get(url, timeout=30)
+        if response.status_code != 200:
+            print(f"Warning: Could not fetch repodata for {subdir} (HTTP {response.status_code})")
+            return set()
+
+        data = response.json()
+        remote = set()
+        # .conda packages
+        remote.update(data.get("packages.conda", {}).keys())
+        # .tar.bz2 packages
+        remote.update(data.get("packages", {}).keys())
+        return remote
+
+    except requests.exceptions.RequestException as e:
+        print(f"Warning: Could not fetch repodata for {subdir}: {e}")
+        return set()
 
 
 def upload_package(filepath: Path, channel: str, token: str, force: bool = False) -> bool:
@@ -112,28 +135,63 @@ def upload_package(filepath: Path, channel: str, token: str, force: bool = False
 
 
 def find_packages(output_dir: Path) -> list[Path]:
-    """Find all conda packages in output directory."""
+    """Find all conda packages in output directory, skipping non-platform subdirs."""
     packages = []
+    # Only look in valid conda subdirs (platform dirs and noarch)
+    valid_subdirs = {
+        "linux-64", "linux-aarch64", "linux-ppc64le", "linux-s390x",
+        "osx-64", "osx-arm64", "win-64", "win-arm64", "noarch",
+    }
 
     for subdir in output_dir.iterdir():
-        if subdir.is_dir():
-            # Look for .conda and .tar.bz2 files
+        if subdir.is_dir() and subdir.name in valid_subdirs:
             packages.extend(subdir.glob("*.conda"))
             packages.extend(subdir.glob("*.tar.bz2"))
 
     return sorted(packages)
 
 
+def filter_new_packages(packages: list[Path], channel: str) -> tuple[list[Path], list[Path]]:
+    """
+    Filter packages to only those not already on the remote channel.
+
+    Returns:
+        Tuple of (new_packages, skipped_packages)
+    """
+    # Collect which subdirs we need to check
+    subdirs = set()
+    for pkg in packages:
+        subdirs.add(pkg.parent.name)
+
+    # Fetch remote package lists for each subdir
+    remote_packages: dict[str, set[str]] = {}
+    for subdir in subdirs:
+        print(f"Fetching remote package list for {subdir}...")
+        remote_packages[subdir] = get_remote_packages(channel, subdir)
+
+    # Filter
+    new_packages = []
+    skipped = []
+    for pkg in packages:
+        subdir = pkg.parent.name
+        if pkg.name in remote_packages.get(subdir, set()):
+            skipped.append(pkg)
+        else:
+            new_packages.append(pkg)
+
+    return new_packages, skipped
+
+
 def main():
     parser = argparse.ArgumentParser(
-        description="Upload conda packages to prefix.dev",
+        description="Upload conda packages to prefix.dev (skips packages already on the channel)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   # Upload a single package
   %(prog)s output/linux-64/mypackage-1.0-h123_0.conda
 
-  # Upload all packages in output/
+  # Upload all new packages (skips already-uploaded)
   %(prog)s --all
 
   # Force overwrite existing packages
@@ -143,7 +201,7 @@ Examples:
   %(prog)s --channel my-channel --all
 
 Environment:
-  PREFIX_API_TOKEN    Your prefix.dev API token (required)
+  PREFIX_API_KEY    Your prefix.dev API token (required)
         """
     )
 
@@ -198,10 +256,23 @@ Environment:
         print("No packages found to upload")
         sys.exit(1)
 
-    print(f"Found {len(packages)} package(s) to upload to channel '{args.channel}':")
+    print(f"Found {len(packages)} local package(s)")
+
+    # Filter out packages already on the channel (unless --force)
+    if not args.force:
+        packages, skipped = filter_new_packages(packages, args.channel)
+        if skipped:
+            print(f"\nSkipping {len(skipped)} package(s) already on '{args.channel}':")
+            for pkg in skipped:
+                print(f"  - {pkg.parent.name}/{pkg.name}")
+        if not packages:
+            print("\nAll packages are already on the channel. Nothing to upload.")
+            sys.exit(0)
+
+    print(f"\n{len(packages)} package(s) to upload to '{args.channel}':")
     for pkg in packages:
         size_mb = pkg.stat().st_size / (1024 * 1024)
-        print(f"  - {pkg.name} ({size_mb:.2f} MB)")
+        print(f"  - {pkg.parent.name}/{pkg.name} ({size_mb:.2f} MB)")
     print()
 
     if args.dry_run:
