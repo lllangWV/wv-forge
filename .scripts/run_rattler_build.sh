@@ -13,6 +13,7 @@ set -euo pipefail
 REPO="/home/conda/wv-forge"
 VARIANT_CONFIG="$REPO/variants.yaml"
 OUTPUT_DIR="$REPO/output"
+CONDA_FORGE_PINNING="/opt/conda/conda_build_config.yaml"
 
 # Channels for dependency resolution (order matters: our channel first)
 CHANNELS=(
@@ -38,7 +39,7 @@ log_info "Installing rattler-build and sccache..."
 
 micromamba install --root-prefix /opt/conda --prefix /opt/conda \
     --yes --override-channels --channel conda-forge \
-    rattler-build sccache
+    rattler-build sccache conda-forge-pinning
 
 export PATH="/opt/conda/bin:$PATH"
 
@@ -126,6 +127,7 @@ for pkg_spec in "${PACKAGES[@]}"; do
         variant)
             rattler-build build \
                 "${COMMON_ARGS[@]}" \
+                -m "$CONDA_FORGE_PINNING" \
                 -m "$VARIANT_CONFIG" \
                 || BUILD_OK=false
             ;;
