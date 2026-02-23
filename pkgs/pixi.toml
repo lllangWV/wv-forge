@@ -1,70 +1,196 @@
-# Main workspace for building Pointcept and its dependencies from source
-#
-# This workspace coordinates building the entire dependency chain:
-# ccimport (conda-forge) -> pccm -> cumm -> spconv -> pointcept
-#
-# Usage:
-#   pixi run build-pccm      # Build pccm first
-#   pixi run build-cumm      # Build cumm (requires pccm)
-#   pixi run build-spconv    # Build spconv (requires cumm)
-#   pixi run build-pointcept # Build pointcept (requires spconv)
-#   pixi run build-all       # Build entire chain in order
-
 [workspace]
-name = "pointcept-from-source"
-channels = ["conda-forge", "nvidia", "pytorch"]
-platforms = ["linux-64"]
-preview = ["pixi-build"]
+name = "wv-forge"
+requires-pixi = ">=0.59.0"
+description = "The entry point to wv-forge"
+version = "0.1.0"
+# license = "BSD-3-Clause"
+# license-file = "LICENSE.txt"
+authors = ["Logan Lang <lllangWV@gmail.com"]
+# Use conda-forge for dependencies. Add "wv-forge" when the channel exists on Anaconda.org
+channels = ["https://prefix.dev/wv-forge", "conda-forge"]
+platforms = [
+    "linux-64", "linux-aarch64", "osx-64", "osx-arm64", "win-64"
+    # TODO: add here and below in `feature.win` when possible
+    # "win-arm64"
+]
 
-[dependencies]
-python = ">=3.10,<3.13"
-rattler-build = ">=0.35"
-
-[system-requirements]
-# Specify CUDA version requirement
-cuda = "12"
 
 [tasks]
-# Individual package builds
-build-pccm = { cmd = "cd pccm && pixi build", description = "Build pccm package" }
-build-cumm = { cmd = "cd cumm && pixi build", description = "Build cumm package (CUDA)" }
-build-spconv = { cmd = "cd spconv && pixi build", description = "Build spconv package (CUDA)" }
-build-pointcept = { cmd = "cd pointcept && pixi build", description = "Build pointcept package" }
+build-cloudcompare = "rattler-build build -r src/cloudcompare/recipe.yaml -c conda-forge"
 
-# Build all in dependency order
-build-all = { cmd = "pixi run build-pccm && pixi run build-cumm && pixi run build-spconv && pixi run build-pointcept", description = "Build all packages in order" }
+[tasks.upload]
+description = "Upload packages to prefix.dev (skips already-uploaded by default)"
+cmd = "python scripts/upload_to_prefix.py {{ flags }}"
+args = [{ arg = "flags", default = "--all" }]
 
-# Debug/development helpers
-debug-pccm = { cmd = "cd pccm && rattler-build debug --recipe recipe/recipe.yaml", description = "Setup pccm debug environment" }
-debug-cumm = { cmd = "cd cumm && rattler-build debug --recipe recipe/recipe.yaml", description = "Setup cumm debug environment" }
-debug-spconv = { cmd = "cd spconv && rattler-build debug --recipe recipe/recipe.yaml", description = "Setup spconv debug environment" }
-debug-pointcept = { cmd = "cd pointcept && rattler-build debug --recipe recipe/recipe.yaml", description = "Setup pointcept debug environment" }
 
-# Create patches from modifications
-create-patch-cumm = { cmd = "cd cumm && rattler-build create-patch --directory output/bld/rattler-build_cumm_*/work --name conda-fixes --patch-dir recipe/", description = "Create patch for cumm" }
-create-patch-spconv = { cmd = "cd spconv && rattler-build create-patch --directory output/bld/rattler-build_spconv_*/work --name conda-fixes --patch-dir recipe/", description = "Create patch for spconv" }
-create-patch-pointcept = { cmd = "cd pointcept && rattler-build create-patch --directory output/bld/rattler-build_pointcept_*/work --name conda-fixes --patch-dir recipe/", description = "Create patch for pointcept" }
 
-# Clean build artifacts
-clean = { cmd = "rm -rf */output */.pixi", description = "Clean all build artifacts" }
+[feature.python.dependencies]
+python = "3.12.*"
 
-[feature.cuda118]
-# Feature for building with CUDA 11.8
-[feature.cuda118.activation]
-env = { CUMM_CUDA_VERSION = "11.8", CUDA_VERSION = "11.8" }
 
-[feature.cuda124]
-# Feature for building with CUDA 12.4
-[feature.cuda124.activation]
-env = { CUMM_CUDA_VERSION = "12.4", CUDA_VERSION = "12.4" }
+[feature.build.activation.env]
+C="sccache $C"
+CXX="sccache $CXX"
+[feature.build.dependencies]
+conda = ">=25.9.0"
+conda-libmamba-solver = ">=24.9.0"
+conda-build = ">=25.3.1"
+conda-index = ">=0.3.0"
+conda-forge-ci-setup = ">=4.9.3,<5.0"
+conda-forge-pinning = "*"
+frozendict = "*"
+networkx = "2.4.*"
+rattler-build-conda-compat = ">=1.2.0,<2.0.0a0"
 
-[feature.cuda126]
-# Feature for building with CUDA 12.6
-[feature.cuda126.activation]
-env = { CUMM_CUDA_VERSION = "12.6", CUDA_VERSION = "12.6" }
+[feature.build.tasks.build]
+description = "Build packages in Docker with rattler-build (default: --all)"
+cmd = "python build_locally.py {{ flags }}"
+args = [{ arg = "flags", default = "--all" }]
+
+[feature.build.tasks.build-clean]
+description = "Clean built outputs and rebuild all packages from scratch"
+depends-on = [{ task = "build", args = ["--clean"] }]
+
+[feature.build.tasks.build-noarch]
+description = "Build only noarch packages in Docker"
+depends-on = [{ task = "build", args = ["--noarch-only"] }]
+
+[feature.build.tasks.build-variant]
+description = "Build only CUDA variant packages in Docker"
+depends-on = [{ task = "build", args = ["--variant-only"] }]
+
+[feature.linux]
+# The linux feature runs on every platform that can run Docker.
+platforms = ["linux-64", "linux-aarch64", "osx-64", "osx-arm64", "win-64"]
+[feature.linux.tasks.build-linux]
+description = "Build packages in Docker with rattler-build (default: --all)"
+cmd = "python build_locally.py {{ flags }}"
+args = [{ arg = "flags", default = "--all" }]
+
+[feature.osx]
+# The osx env will run directly on the machine.
+platforms = ["osx-64", "osx-arm64"]
+[feature.osx.tasks.build-osx]
+description = "build directly on a MacOS host machine"
+cmd = "python build_locally.py --filter 'osx*'"
+[feature.osx.tasks.build-osx.env]
+CONDA_BLD_PATH = "$PIXI_PROJECT_ROOT/build_artifacts"
+MINIFORGE_HOME = "$CONDA_PREFIX"
+OSX_SDK_DIR = "$PIXI_PROJECT_ROOT/.pixi/macOS-SDKs"
+
+[feature.win]
+# The windows env will run directly on the machine.
+platforms = ["win-64"]
+[feature.win.tasks.build-win]
+description = "build directly on a Windows host machine"
+cmd = "python build_locally.py --filter 'win*'"
+[feature.win.tasks.build-win.env]
+CONDA_BLD_PATH = "$PIXI_PROJECT_ROOT/build_artifacts"
+MINIFORGE_HOME = "$CONDA_PREFIX"
+
+[feature.grayskull.dependencies]
+grayskull = ">=2.7.3"
+conda-recipe-manager = ">=0.8.0"
+[feature.grayskull.tasks.pypi]
+description = "generate a v1 (rattler-build) recipe for a PyPI package name with `grayskull`"
+cmd = "cd recipes && grayskull pypi --strict-conda-forge --use-v1-format"
+[feature.grayskull.tasks.cran]
+description = "generate a v1 (rattler-build) recipe for a CRAN package name with `grayskull`"
+cmd = "cd recipes && grayskull cran --strict-conda-forge --use-v1-format"
+[feature.grayskull.tasks.pypi-v0]
+description = "generate a v0 (conda-build) recipe for a PyPI package name with `grayskull`"
+cmd = "cd recipes && grayskull pypi --strict-conda-forge"
+[feature.grayskull.tasks.cran-v0]
+description = "generate a v0 (conda-build) recipe for a CRAN package name with `grayskull`"
+cmd = "cd recipes && grayskull cran --strict-conda-forge"
+
+[feature.conda-smithy.dependencies]
+conda-smithy = ">=3.44.6,<4"
+[feature.conda-smithy.tasks.lint]
+description = "validate all recipes with `conda-smithy`"
+cmd = "conda-smithy recipe-lint --conda-forge recipes/*"
+
+[feature.shellcheck]
+# merge this with `conda-smithy` when available for `linux-ppc64le`
+platforms = ["linux-64", "linux-aarch64", "osx-64", "osx-arm64", "win-64"]
+dependencies.shellcheck = ">=0.10.0"
 
 [environments]
-default = { features = ["cuda124"], solve-group = "default" }
-cuda118 = { features = ["cuda118"], solve-group = "cuda118" }
-cuda124 = { features = ["cuda124"], solve-group = "cuda124" }
-cuda126 = { features = ["cuda126"], solve-group = "cuda126" }
+# cumm = { features = ["cumm"], solve-group = "cumm" }
+# sam3d = { features = ["sam3d"], solve-group = "sam3d" }
+# linux only needs Python to run build-locally.py. Everything else happens in Docker.
+linux = ["linux", "python"]
+# osx and win do run natively on the machine, so we need the build deps too
+osx = ["osx", "python", "build"]
+win = ["win", "python", "build"]
+build = ["python", "build"]
+grayskull = ["python", "grayskull"]
+conda-smithy = ["python", "conda-smithy", "shellcheck"]
+
+
+
+
+
+# [feature.cumm]
+# platforms = ["linux-64"]
+# system-requirements = { cuda = "12.6" }
+
+# [feature.cumm.dependencies]
+# cumm = "*"
+# cuda-version = "12.6.*"
+# spconv = "*"
+# pytorch3d = "*"
+# sam3d-objects = "*"
+# moge = "*"
+# pccm = "*"
+# pointcept = "*"
+
+
+# [feature.sam3d]
+# platforms = ["linux-64"]
+# system-requirements = { cuda = "12.6" }
+
+# [feature.sam3d.dependencies]
+# python = "==3.12.12"
+# cumm = "*"
+# cuda-version = "12.6.*"
+# spconv = "*"
+# pytorch3d = {version = "*",channel = "https://prefix.dev/wv-forge"}
+# sam3d-objects = "*"
+# moge = "*"
+# pccm = "*"
+# gsplat = "*"
+# kaolin = "*"
+# # open3d = "*"
+# flash-attn = "*"
+# xatlas-python = "*"
+
+# [feature.sam3d.pypi-dependencies]
+# open3d = "*"
+
+
+
+# [feature.sam3d.system-requirements]
+# cuda = "12.6"
+# [feature.sam3d.dependencies]
+# python = "==3.12.12"
+# cumm = "*"
+# cuda-version = "12.6.*"
+# spconv = "*"
+# pytorch3d = {version = "*",channel = "https://prefix.dev/wv-forge"}
+# sam3d-objects = "*"
+# moge = "*"
+# pccm = "*"
+# gsplat = "*"
+# kaolin = "*"
+# open3d = "*"
+# flash-attn = "*"
+# xatlas-python = "*"
+
+# # [feature.sam3d.pypi-dependencies]
+# # open3d = "*"
+
+# [environments]
+# cumm = { features = ["cumm"], solve-group = "cumm" }
+# sam3d = { features = ["sam3d"], solve-group = "sam3d" }

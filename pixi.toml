@@ -10,8 +10,6 @@ authors = ["Logan Lang <lllangWV@gmail.com"]
 channels = ["https://prefix.dev/wv-forge", "conda-forge"]
 platforms = [
     "linux-64", "linux-aarch64", "osx-64", "osx-arm64", "win-64"
-    # TODO: add here and below in `feature.win` when possible
-    # "win-arm64"
 ]
 
 
@@ -116,9 +114,37 @@ cmd = "conda-smithy recipe-lint --conda-forge recipes/*"
 platforms = ["linux-64", "linux-aarch64", "osx-64", "osx-arm64", "win-64"]
 dependencies.shellcheck = ">=0.10.0"
 
+
+
+
+[feature.sam3d]
+platforms = ["linux-64"]
+system-requirements = { cuda = "12.6" }
+
+[feature.sam3d.dependencies]
+python = "3.13.*"
+cumm = "*"
+cuda-version = "12.6.*"
+spconv = {version = "*",channel = "https://prefix.dev/wv-forge"}
+pytorch3d = {version = "*",channel = "https://prefix.dev/wv-forge"}
+sam3d-objects = {version = "*",channel = "https://prefix.dev/wv-forge"}
+moge = {version = "*",channel = "https://prefix.dev/wv-forge"}
+pccm = {version = "*",channel = "https://prefix.dev/wv-forge"}
+open3d = {version = "*",channel = "https://prefix.dev/wv-forge"}
+gsplat = "*"
+kaolin = "*"
+
+flash-attn = "*"
+xatlas-python = "*"
+
+# [feature.sam3d.pypi-dependencies]
+# open3d = "*"
+
+
+
 [environments]
 # cumm = { features = ["cumm"], solve-group = "cumm" }
-# sam3d = { features = ["sam3d"], solve-group = "sam3d" }
+sam3d = { features = ["sam3d"], solve-group = "sam3d" }
 # linux only needs Python to run build-locally.py. Everything else happens in Docker.
 linux = ["linux", "python"]
 # osx and win do run natively on the machine, so we need the build deps too
@@ -168,3 +194,29 @@ conda-smithy = ["python", "conda-smithy", "shellcheck"]
 
 # [feature.sam3d.pypi-dependencies]
 # open3d = "*"
+
+
+
+# [feature.sam3d.system-requirements]
+# cuda = "12.6"
+# [feature.sam3d.dependencies]
+# python = "==3.12.12"
+# cumm = "*"
+# cuda-version = "12.6.*"
+# spconv = "*"
+# pytorch3d = {version = "*",channel = "https://prefix.dev/wv-forge"}
+# sam3d-objects = "*"
+# moge = "*"
+# pccm = "*"
+# gsplat = "*"
+# kaolin = "*"
+# open3d = "*"
+# flash-attn = "*"
+# xatlas-python = "*"
+
+# # [feature.sam3d.pypi-dependencies]
+# # open3d = "*"
+
+# [environments]
+# cumm = { features = ["cumm"], solve-group = "cumm" }
+# sam3d = { features = ["sam3d"], solve-group = "sam3d" }
