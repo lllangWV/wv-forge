@@ -2,16 +2,60 @@
 # rattler-build reads this file via -m flag to expand recipes into multiple builds.
 #
 # Usage:
-#   rattler-build build -r <recipe> -m variants.yaml -c conda-forge -c nvidia
+#   rattler-build build -r <recipe> -m conda_forge_pinning.yaml -m variants.yaml
 #
-# This produces a cross-product: 2 Python x 3 CUDA = 6 variants per CUDA package.
+# This produces: 2 Python x 3 CUDA = 6 variants per CUDA package.
 # Noarch packages should use --ignore-recipe-variants to skip this matrix.
+
+# Override channel_sources from conda-forge-pinning to include our channel.
+# rattler-build errors if both channel_sources (from -m config) and -c flags are set,
+# so variant builds rely on this instead of -c flags.
+channel_sources:
+  - "https://prefix.dev/wv-forge,conda-forge,nvidia"
 
 python:
   - "3.12"
   - "3.13"
 
+c_compiler_version:
+- "14"
+
+cxx_compiler_version:
+- "14"
+
 cuda_version:
-  - "12.6"
-  - "12.8"
-  - "12.9"
+- "12.9"
+
+cuda_compiler_version:
+- "12.9"
+
+# Override stale conda-forge-pinning for vtk 9.5.1 compatibility.
+# vtk-base 9.5.1 builds for Python 3.12+ need fmt 11.2 and libboost-headers 1.88,
+# but the pinning still has fmt 12.0 and libboost-headers 1.86.
+# Remove these overrides once the pinning catches up.
+# fmt:
+# - "11.2"
+libboost_headers:
+  - "1.88"
+
+pybind11_abi:
+  - '11'
+# vtk:
+#   - "9.5.2"
+# Compiler and CUDA versions are zipped (not cross-producted) because
+# CUDA 12.6 only supports GCC <= 13, while CUDA 12.8+ supports GCC 14.
+# zip_keys:
+#   - [c_compiler_version, cxx_compiler_version, cuda_version]
+
+# c_compiler_version:
+  # - "13"
+  # - "14"
+  # - "14"
+# cxx_compiler_version:
+  # - "13"
+  # - "14"
+  # - "14"
+# cuda_version:
+#   - "12.6"
+#   - "12.8"
+  # - "12.9"

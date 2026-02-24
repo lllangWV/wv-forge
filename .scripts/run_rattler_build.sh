@@ -111,7 +111,6 @@ for pkg_spec in "${PACKAGES[@]}"; do
     COMMON_ARGS=(
         "--no-build-id"
         "-r" "$recipe_path"
-        "${CHANNELS[@]}"
         "--output-dir" "$OUTPUT_DIR"
         "--skip-existing" "local"
     )
@@ -121,10 +120,13 @@ for pkg_spec in "${PACKAGES[@]}"; do
         noarch)
             rattler-build build \
                 "${COMMON_ARGS[@]}" \
+                "${CHANNELS[@]}" \
                 --ignore-recipe-variants \
                 || BUILD_OK=false
             ;;
         variant)
+            # Variant builds get channels from channel_sources in variants.yaml
+            # (overrides conda-forge-pinning). Using -c flags here would conflict.
             rattler-build build \
                 "${COMMON_ARGS[@]}" \
                 -m "$CONDA_FORGE_PINNING" \
@@ -134,6 +136,7 @@ for pkg_spec in "${PACKAGES[@]}"; do
         standard)
             rattler-build build \
                 "${COMMON_ARGS[@]}" \
+                "${CHANNELS[@]}" \
                 || BUILD_OK=false
             ;;
         *)
