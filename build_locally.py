@@ -318,6 +318,14 @@ def main():
         "--dry-run", "-n", action="store_true",
         help="Print the docker command without running it",
     )
+    parser.add_argument(
+        "--no-upload", action="store_true",
+        help="Skip uploading packages to prefix.dev after build",
+    )
+    parser.add_argument(
+        "--force", "-f", action="store_true",
+        help="Overwrite existing packages on prefix.dev during upload",
+    )
 
     args = parser.parse_args()
     repo_root = Path(__file__).resolve().parent
@@ -430,7 +438,23 @@ def main():
     # Run Docker build
     print(f"{GREEN}Launching Docker build...{NC}\n")
     result = subprocess.run(cmd)
-    sys.exit(result.returncode)
+
+    if result.returncode != 0:
+        sys.exit(result.returncode)
+
+    # Upload packages to prefix.dev
+    if not args.no_upload:
+        print(f"\n{GREEN}Uploading packages to prefix.dev/wv-forge...{NC}\n")
+        upload_script = repo_root / "scripts" / "upload_to_prefix.py"
+        upload_cmd = [sys.executable, str(upload_script), "--all", "--output-dir", str(output_dir)]
+        if args.force:
+            upload_cmd.append("--force")
+        upload_result = subprocess.run(upload_cmd)
+        if upload_result.returncode != 0:
+            print(f"\n{RED}Upload failed (build succeeded). Run manually: pixi run upload{NC}")
+            sys.exit(upload_result.returncode)
+
+    sys.exit(0)
 
 
 if __name__ == "__main__":

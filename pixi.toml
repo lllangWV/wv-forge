@@ -40,6 +40,8 @@ conda-forge-pinning = "*"
 frozendict = "*"
 networkx = "2.4.*"
 rattler-build-conda-compat = ">=1.2.0,<2.0.0a0"
+requests = ">=2.28"
+python-dotenv = ">=1.0"
 
 [feature.build.tasks.build]
 description = "Build packages in Docker with rattler-build (default: --all)"
@@ -117,34 +119,43 @@ dependencies.shellcheck = ">=0.10.0"
 
 
 
-[feature.sam3d]
-platforms = ["linux-64"]
-system-requirements = { cuda = "12.6" }
+# [feature.sam3d]
+# platforms = ["linux-64"]
+# system-requirements = { cuda = "12.6" }
 
-[feature.sam3d.dependencies]
-python = "3.13.*"
-cumm = "*"
-cuda-version = "12.6.*"
-spconv = {version = "*",channel = "https://prefix.dev/wv-forge"}
-pytorch3d = {version = "*",channel = "https://prefix.dev/wv-forge"}
-sam3d-objects = {version = "*",channel = "https://prefix.dev/wv-forge"}
-moge = {version = "*",channel = "https://prefix.dev/wv-forge"}
-pccm = {version = "*",channel = "https://prefix.dev/wv-forge"}
-open3d = {version = "*",channel = "https://prefix.dev/wv-forge"}
-gsplat = "*"
-kaolin = "*"
+# [feature.sam3d.dependencies]
+# python = "3.13.*"
+# cumm = "*"
+# cuda-version = "12.6.*"
+# spconv = {version = "*",channel = "https://prefix.dev/wv-forge"}
+# pytorch3d = {version = "*",channel = "https://prefix.dev/wv-forge"}
+# sam3d-objects = {version = "*",channel = "https://prefix.dev/wv-forge"}
+# moge = {version = "*",channel = "https://prefix.dev/wv-forge"}
+# pccm = {version = "*",channel = "https://prefix.dev/wv-forge"}
+# open3d = {version = "*",channel = "https://prefix.dev/wv-forge"}
+# gsplat = "*"
+# kaolin = "*"
 
-flash-attn = "*"
-xatlas-python = "*"
+# flash-attn = "*"
+# xatlas-python = "*"
 
 # [feature.sam3d.pypi-dependencies]
 # open3d = "*"
 
+# [feature.sam3d]
+# platforms = ["linux-64"]
+# system-requirements = { cuda = "12.9" }
 
+# [feature.sam3d.dependencies]
+# cuda-version = ">=12.9.0"
+# pytorch-gpu = "*"
+# spconv = "*"
+# pytorch3d = "*"
+# sam3d-objects = "*"
 
 [environments]
 # cumm = { features = ["cumm"], solve-group = "cumm" }
-sam3d = { features = ["sam3d"], solve-group = "sam3d" }
+# sam3d = { features = ["sam3d"], solve-group = "sam3d" }
 # linux only needs Python to run build-locally.py. Everything else happens in Docker.
 linux = ["linux", "python"]
 # osx and win do run natively on the machine, so we need the build deps too
