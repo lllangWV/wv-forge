@@ -20,6 +20,11 @@ source:
       - patches/fix-find-imgui.patch
       - patches/7249.patch
       - patches/fix-gcc15-cstdint.patch
+      - patches/fix-cuda-arch-3digit.patch
+      - patches/fix-cmake4-compat.patch
+      - patches/fix-missing-memory-include.patch
+      - patches/fix-civetweb-visibility.patch
+      - patches/fix-civetweb-whole-archive.patch
   - url: https://github.com/isl-org/Open3D-ML/archive/v${{ version }}.tar.gz
     sha256: 419d1986f4513af0a1209eb946fd6c4249d1eaba88a0da29f83109429a854f6c
     target_directory: open3d_ml
@@ -40,24 +45,28 @@ build:
 requirements:
   build:
     - ${{ compiler('c') }}
-    - ${{ stdlib("c") }}
+    - ${{ stdlib('c') }}
     - ${{ compiler('cxx') }}
+    - ${{ compiler('cuda')}}
     - cmake
     - make
     - ninja
     - pkg-config
     - git
-    - libgomp                                # [linux]
-    - llvm-openmp                            # [osx]
-    - python                                 # [build_platform != target_platform]
-    - pip                                    # [build_platform != target_platform]
-    - cross-python_{{ target_platform }}     # [build_platform != target_platform]
-    - qt6-main                               # [build_platform != target_platform and not ppc64le]
+    - nodejs >=14
+    - yarn
+    - if: linux
+      then: libgomp
+    - if: osx
+      then: llvm-openmp
   host:
     - python
     - pip
     - setuptools
     - yapf
+    - jupyter_packaging
+    - jupyterlab >=4
+    - ipywidgets >=8.0.4
     # CUDA
     - cuda-version
     - cuda-nvcc
@@ -71,7 +80,7 @@ requirements:
     - cuda-nvrtc-dev
     - cuda-profiler-api
     # PyTorch (for Open3D-ML PyTorch ops)
-    - pytorch-gpu >=2.2.0
+    - pytorch-gpu
     # OpenGL / X11
     - libgl-devel
     - libglx-devel
@@ -86,7 +95,8 @@ requirements:
     - embree
     - glew
     - glfw
-    - fmt
+    - libcxx
+    # - fmt
     - libjpeg-turbo
     - gmock
     - jsoncpp
@@ -115,7 +125,8 @@ requirements:
   run:
     - python
     - numpy
-    - libopenblas
+    - libcblas
+    - liblapacke
     - scikit-learn
     - pyyaml
     - pandas
@@ -126,6 +137,7 @@ requirements:
     - pillow
     - plotly
     - dash
+    - ipywidgets >=8.0.4
     - ${{ pin_compatible('pytorch-gpu', upper_bound='x.x') }}
     # CUDA Enhanced Compatibility: pin to major version only
     - ${{ pin_compatible('cuda-version', lower_bound='x.x', upper_bound='x') }}
@@ -141,7 +153,6 @@ requirements:
       - ${{ pin_subpackage('open3d', upper_bound='x.x.x') }}
   ignore_run_exports:
     from_package:
-      # Original feedstock suppressions (libcblas NOT suppressed: needed for libopenblas at runtime)
       - minizip
       - msgpack-c
       - msgpack-cxx

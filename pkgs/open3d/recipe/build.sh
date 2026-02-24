@@ -1,20 +1,20 @@
 set -euxo pipefail
 
 export QT_HOST_PATH="$PREFIX"
-export CUDA_HOME="$PREFIX"
+export CUDA_HOME="$BUILD_PREFIX"
 
 # Patch sysroot libc.so linker script: replace absolute paths with =-prefixed
 # paths so GNU ld prepends the sysroot even when invoked by nvcc (which doesn't
 # pass --sysroot to the linker).
 # Before: GROUP ( /lib64/libc.so.6 /usr/lib64/libc_nonshared.a ... )
 # After:  GROUP ( =/lib64/libc.so.6 =/usr/lib64/libc_nonshared.a ... )
-for _sysroot in "${BUILD_PREFIX}/x86_64-conda-linux-gnu/sysroot" \
-                "${PREFIX}/x86_64-conda-linux-gnu/sysroot"; do
-    _libc_so="${_sysroot}/usr/lib64/libc.so"
-    if [ -f "${_libc_so}" ]; then
-        sed -i 's| /lib64/| =/lib64/|g; s| /usr/lib64/| =/usr/lib64/|g' "${_libc_so}"
-    fi
-done
+# for _sysroot in "${BUILD_PREFIX}/x86_64-conda-linux-gnu/sysroot" \
+#                 "${PREFIX}/x86_64-conda-linux-gnu/sysroot"; do
+#     _libc_so="${_sysroot}/usr/lib64/libc.so"
+#     if [ -f "${_libc_so}" ]; then
+#         sed -i 's| /lib64/| =/lib64/|g; s| /usr/lib64/| =/usr/lib64/|g' "${_libc_so}"
+#     fi
+# done
 
 # Open3D's CMake uses ExternalProject_Add with GIT_REPOSITORY for Open3D-ML,
 # so it expects a git repo. Initialize the extracted source as one.
@@ -41,10 +41,16 @@ if(NOT TARGET CUDA::nvToolsExt)
 endif()
 NVTX_COMPAT
 
+# Suppress harmless -Wundef warnings from NVIDIA CCCL headers that flood the build log
+export CXXFLAGS="${CXXFLAGS:-} -Wno-undef"
+export CUDAFLAGS="${CUDAFLAGS:-} -Xcompiler=-Wno-undef"
+
 cmake ${SRC_DIR} ${CMAKE_ARGS} \
     -DCMAKE_PROJECT_INCLUDE=${PWD}/nvtoolsext_compat.cmake \
+    -DCLANG_LIBDIR=${PREFIX}/lib \
     -DBUILD_CUDA_MODULE=ON \
-    -DBUILD_COMMON_CUDA_ARCHS=ON \
+    -DBUILD_COMMON_CUDA_ARCHS=OFF \
+    -DCMAKE_CUDA_ARCHITECTURES="89;120" \
     -DBUILD_WITH_CUDA_STATIC=OFF \
     -DBUILD_PYTORCH_OPS=ON \
     -DBUNDLE_OPEN3D_ML=ON \
@@ -53,12 +59,12 @@ cmake ${SRC_DIR} ${CMAKE_ARGS} \
     -DBUILD_AZURE_KINECT=OFF \
     -DBUILD_EXAMPLES=OFF \
     -DBUILD_ISPC_MODULE=OFF \
-    -DBUILD_GUI=OFF \
+    -DBUILD_GUI=ON \
     -DBUILD_LIBREALSENSE=OFF \
     -DBUILD_SHARED_LIBS=ON \
-    -DBUILD_WEBRTC=OFF \
+    -DBUILD_WEBRTC=ON \
     -DENABLE_HEADLESS_RENDERING=OFF \
-    -DBUILD_JUPYTER_EXTENSION=OFF \
+    -DBUILD_JUPYTER_EXTENSION=ON \
     -DOPEN3D_USE_ONEAPI_PACKAGES=OFF \
     -DUSE_BLAS=ON \
     -DUSE_SYSTEM_ASSIMP=ON \
@@ -70,7 +76,7 @@ cmake ${SRC_DIR} ${CMAKE_ARGS} \
     -DUSE_SYSTEM_GLEW=ON \
     -DUSE_SYSTEM_GLFW=ON \
     -DUSE_SYSTEM_GOOGLETEST=ON \
-    -DUSE_SYSTEM_IMGUI=ON \
+    -DUSE_SYSTEM_IMGUI=OFF \
     -DUSE_SYSTEM_JPEG=ON \
     -DUSE_SYSTEM_JSONCPP=ON \
     -DUSE_SYSTEM_LIBLZF=ON \
@@ -90,7 +96,9 @@ cmake ${SRC_DIR} ${CMAKE_ARGS} \
     -DWITH_FAISS=OFF \
     -DPython3_EXECUTABLE=$PYTHON
 
-cmake --build . --config Release -- -j$CPU_COUNT
+JOBS=$(( CPU_COUNT > 4 ? CPU_COUNT - 4 : 1 ))
+# Use -j1 temporarily to debug build failures, then restore -j${JOBS}
+cmake --build . --config Release -- -j${JOBS}
 cmake --build . --config Release --target install
 cmake --build . --config Release --target install-pip-package
 

@@ -1,0 +1,22 @@
+--- a/3rdparty/find_dependencies.cmake
++++ b/3rdparty/find_dependencies.cmake
+@@ -1989,6 +1989,17 @@
+         DEPENDS      ext_civetweb
+     )
+     list(APPEND Open3D_3RDPARTY_PRIVATE_TARGETS_FROM_CUSTOM Open3D::3rdparty_civetweb)
++    # Force all civetweb-cpp symbols (especially CivetServer RTTI typeinfo)
++    # into the shared library.  Without --whole-archive the linker may omit
++    # RTTI symbols from the static archive, causing an undefined-symbol error
++    # at runtime when PyTorch loads open3d_torch_ops.so with RTLD_NOW.
++    if(BUILD_SHARED_LIBS AND UNIX AND NOT APPLE)
++        set_target_properties(3rdparty_civetweb PROPERTIES INTERFACE_LINK_LIBRARIES "")
++        target_link_libraries(3rdparty_civetweb INTERFACE
++            "$<BUILD_INTERFACE:${CIVETWEB_LIB_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}civetweb${CMAKE_STATIC_LIBRARY_SUFFIX}>"
++            "$<BUILD_INTERFACE:-Wl,--whole-archive>"
++            "$<BUILD_INTERFACE:${CIVETWEB_LIB_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}civetweb-cpp${CMAKE_STATIC_LIBRARY_SUFFIX}>"
++            "$<BUILD_INTERFACE:-Wl,--no-whole-archive>"
++        )
++    endif()
+ else()
+     # Don't include WebRTC headers in Open3D.h.
+     set(BUILD_WEBRTC_COMMENT "//")

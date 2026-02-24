@@ -22,12 +22,12 @@ build:
 
 requirements:
   host:
-    - python >=3.9
+    - python
     - pip
-    - setuptools >=61.0
+    - setuptools
     - wheel
   run:
-    - python >=3.9
+    - python
     - click
     - opencv
     - scipy
@@ -36,7 +36,7 @@ requirements:
     - pillow
     - huggingface_hub
     - numpy
-    - pytorch-gpu >=2.0.0
+    - pytorch-cpu
     - torchvision
     - gradio
     - utils3d
@@ -46,6 +46,11 @@ tests:
   - python:
       imports:
         - moge
+      # pip_check disabled: sympy's installed dist-info metadata (from
+      # pyproject.toml) requires mpmath<1.4, but conda-forge's sympy recipe
+      # only constrains mpmath>=0.19 — so conda installs mpmath 1.4 which
+      # pip check flags as a conflict. PyPI/conda metadata mismatch.
+      pip_check: false
 
 about:
   homepage: https://github.com/microsoft/MoGe

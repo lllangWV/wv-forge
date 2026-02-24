@@ -1,0 +1,13 @@
+--- a/3rdparty/civetweb/civetweb.cmake
++++ b/3rdparty/civetweb/civetweb.cmake
+@@ -18,7 +18,9 @@
+         -DCIVETWEB_DISABLE_CGI=ON
+         -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+         -DCMAKE_CXX_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=$<BOOL:${GLIBCXX_USE_CXX11_ABI}> $<$<PLATFORM_ID:Windows>:/EHsc>"
+-        ${ExternalProject_CMAKE_ARGS_hidden}
++        # Use non-hidden args: CivetServer RTTI (typeinfo) must be exported from
++        # libOpen3D.so for dynamic_cast / exceptions in the WebRTC server code.
++        ${ExternalProject_CMAKE_ARGS}
+     BUILD_BYPRODUCTS
+         <INSTALL_DIR>/${Open3D_INSTALL_LIB_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}civetweb${CMAKE_STATIC_LIBRARY_SUFFIX}
+         <INSTALL_DIR>/${Open3D_INSTALL_LIB_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}civetweb-cpp${CMAKE_STATIC_LIBRARY_SUFFIX}

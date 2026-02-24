@@ -24,8 +24,8 @@ build:
     env:
       FORCE_CUDA: "1"
       TORCH_CUDA_ARCH_LIST: ${{ "5.0;6.0;7.0;7.5;8.0;8.6;9.0;10.0;12.0+PTX" if cuda_version >= "12.8" else "5.0;6.0;7.0;7.5;8.0;8.6;9.0+PTX" }}
-      MAX_JOBS: "${CPU_COUNT}"
     content: |
+      export MAX_JOBS=$(( CPU_COUNT > 4 ? CPU_COUNT - 4 : 1 ))
       export CUDA_HOME=$PREFIX
       export CUB_HOME=$PREFIX/include
 
@@ -55,8 +55,8 @@ requirements:
     - python
     - pip
     - setuptools
-    - ninja
     - numpy
+    - ninja
     - pytorch-gpu >=2.6.0
     - cudnn
     - cuda-version
@@ -93,6 +93,7 @@ tests:
         - pytorch3d.ops
         - pytorch3d.loss
         - pytorch3d.io
+      pip_check: false
 
 about:
   homepage: https://github.com/facebookresearch/pytorch3d
