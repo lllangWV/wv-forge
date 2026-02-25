@@ -26,7 +26,7 @@ build:
     env:
       SPCONV_DISABLE_JIT: "1"
       CUMM_CUDA_VERSION: "${{ cuda_version }}"
-      CUMM_CUDA_ARCH_LIST: "7.0;7.5;8.0;8.6;8.9;9.0"
+      CUMM_CUDA_ARCH_LIST: "8.9;12.0"
     content: |
       export CUDA_HOME=$PREFIX
       export BOOST_ROOT=$PREFIX/include

@@ -98,7 +98,7 @@ requirements:
     - glew
     - glfw
     - libcxx
-    # - fmt
+    - fmt
     - libjpeg-turbo
     - gmock
     - jsoncpp
