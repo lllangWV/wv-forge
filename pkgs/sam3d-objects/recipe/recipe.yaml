@@ -29,7 +29,7 @@ requirements:
   run:
     - python >=3.12
     # Core
-    - pytorch-gpu >=2.6.0
+    - pytorch
     - torchvision
     - numpy
     - pillow

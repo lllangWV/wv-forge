@@ -3,6 +3,7 @@
 
 context:
   version: "0.7.9"
+  torch_proc_type: ${{ "cuda" if cuda_compiler_version != "None" else "cpu" }}
 
 package:
   name: pytorch3d
@@ -57,7 +58,8 @@ requirements:
     - setuptools
     - numpy
     - ninja
-    - pytorch-gpu >=2.6.0
+    - pytorch
+    - pytorch * [build=${{ torch_proc_type }}*]
     - cudnn
     - cuda-version
     - cuda-nvcc
@@ -68,7 +70,7 @@ requirements:
     - libcublas-dev
   run:
     - ${{ pin_compatible('python', upper_bound='x.x') }}
-    - ${{ pin_compatible('pytorch-gpu', upper_bound='x.x') }}
+    - pytorch * [build=${{ torch_proc_type }}*]
     - ${{ pin_compatible('cuda-version', lower_bound='x.x', upper_bound='x') }}
     - ${{ pin_compatible('cudnn') }}
     - cuda-cudart

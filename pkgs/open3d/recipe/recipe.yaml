@@ -5,6 +5,7 @@
 context:
   name: open3d
   version: "0.19.0"
+  torch_proc_type: ${{ "cuda" if cuda_compiler_version != "None" else "cpu" }}
 
 package:
   name: ${{ name }}
@@ -80,7 +81,8 @@ requirements:
     - cuda-nvrtc-dev
     - cuda-profiler-api
     # PyTorch (for Open3D-ML PyTorch ops)
-    - pytorch-gpu
+    - pytorch
+    - pytorch * [build=${{ torch_proc_type }}*]
     # OpenGL / X11
     - libgl-devel
     - libglx-devel
@@ -138,7 +140,7 @@ requirements:
     - plotly
     - dash
     - ipywidgets >=8.0.4
-    - ${{ pin_compatible('pytorch-gpu', upper_bound='x.x') }}
+    - pytorch * [build=${{ torch_proc_type }}*]
     # CUDA Enhanced Compatibility: pin to major version only
     - ${{ pin_compatible('cuda-version', lower_bound='x.x', upper_bound='x') }}
     - cuda-cudart

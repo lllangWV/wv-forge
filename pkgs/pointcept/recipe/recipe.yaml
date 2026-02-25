@@ -3,6 +3,7 @@
 
 context:
   version: "1.6.0"
+  torch_proc_type: ${{ "cuda" if cuda_compiler_version != "None" else "cpu" }}
 
 package:
   name: pointcept
@@ -24,7 +25,7 @@ build:
       - cuda_version
   script:
     env:
-      TORCH_CUDA_ARCH_LIST: "7.0;7.5;8.0;8.6;8.9;9.0"
+      TORCH_CUDA_ARCH_LIST: "8.9;12.0"
     content: |
       export CUDA_HOME=$PREFIX
 
@@ -47,6 +48,7 @@ requirements:
   build:
     - ${{ compiler('c') }}
     - ${{ compiler('cxx') }}
+    - ${{ compiler('cuda') }}
     - cmake
     - ninja
   host:
@@ -54,7 +56,8 @@ requirements:
     - pip
     - setuptools >=41.0
     - wheel
-    - pytorch-gpu >=2.6.0
+    - pytorch
+    - pytorch * [build=${{ torch_proc_type }}*]
     - numpy
     - cuda-version
     - cuda-cudart-dev
@@ -64,7 +67,7 @@ requirements:
     - libcusolver-dev
   run:
     - ${{ pin_compatible('python', upper_bound='x.x') }}
-    - pytorch-gpu >=2.6.0
+    - pytorch * [build=${{ torch_proc_type }}*]
     - torchvision
     - ${{ pin_compatible('cuda-version', lower_bound='x.x', upper_bound='x') }}
     - cuda-cudart

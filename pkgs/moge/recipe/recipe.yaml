@@ -36,7 +36,7 @@ requirements:
     - pillow
     - huggingface_hub
     - numpy
-    - pytorch-cpu
+    - pytorch
     - torchvision
     - gradio
     - utils3d
