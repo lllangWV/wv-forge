@@ -19,8 +19,8 @@ platforms = [
 build-cloudcompare = "rattler-build build -r src/cloudcompare/recipe.yaml -c conda-forge"
 
 [tasks.upload]
-description = "Upload packages to prefix.dev (skips already-uploaded by default)"
-cmd = "python scripts/upload_to_prefix.py {{ flags }}"
+description = "Upload packages to S3 channel"
+cmd = "python scripts/upload_to_s3.py {{ flags }}"
 args = [{ arg = "flags", default = "--all" }]
 
 

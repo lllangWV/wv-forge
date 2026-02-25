@@ -1,24 +1,39 @@
 #!/usr/bin/env bash
-# build_all.sh — Build and upload all wv-forge packages to prefix.dev
+# build_all.sh — Build and upload all wv-forge packages
 #
 # Usage:
 #   ./build_all.sh              # Build all packages
 #   ./build_all.sh cumm spconv  # Build specific packages
 #
-# Environment:
-#   PREFIX_API_KEY  — prefix.dev API key (or use `rattler-build auth login prefix.dev`)
+# Environment (set in .env or export):
+#   WV_FORGE_CHANNEL_URL  — Channel URL for dependency resolution
+#                           (default: s3://wv-forge)
+#   S3_ACCESS_KEY_ID      — S3 access key for upload and channel auth
+#   S3_SECRET_ACCESS_KEY  — S3 secret key for upload and channel auth
+#   S3_BUCKET             — S3 bucket name (default: wv-forge)
+#   S3_REGION             — S3 region (default: us-east-1)
 #
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
 VARIANT_CONFIG="$REPO_ROOT/variants.yaml"
 OUTPUT_DIR="$REPO_ROOT/output"
-CHANNEL="wv-forge"
-PREFIX_URL="https://prefix.dev"
+
+# Load .env if present
+if [ -f "$REPO_ROOT/.env" ]; then
+    set -a
+    source "$REPO_ROOT/.env"
+    set +a
+fi
+
+# Configurable channel URL (default: S3)
+CHANNEL_URL="${WV_FORGE_CHANNEL_URL:-s3://wv-forge/wv-forge}"
+S3_BUCKET="${S3_BUCKET:-wv-forge/wv-forge}"
+S3_REGION="${S3_REGION:-us-east-2}"
 
 # Channels for dependency resolution (order matters: our channel first)
 CHANNELS=(
-  "-c" "$PREFIX_URL/$CHANNEL"
+  "-c" "$CHANNEL_URL"
   "-c" "conda-forge"
   "-c" "nvidia"
 )
@@ -33,18 +48,58 @@ log_info()  { echo -e "${GREEN}[INFO]${NC} $*"; }
 log_warn()  { echo -e "${YELLOW}[WARN]${NC} $*"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $*"; }
 
+# ─────────────────────────────────────────────
+# Set up RATTLER_AUTH_FILE for S3 channel access
+# ─────────────────────────────────────────────
+if [[ "$CHANNEL_URL" == s3://* ]] && [ -n "${S3_ACCESS_KEY_ID:-}" ] && [ -n "${S3_SECRET_ACCESS_KEY:-}" ]; then
+    log_info "Setting up S3 authentication for channel: $CHANNEL_URL"
+    AUTH_FILE="/tmp/rattler_auth_build_all.json"
+    cat > "$AUTH_FILE" <<AUTHEOF
+{
+    "$CHANNEL_URL": {
+        "S3Credentials": {
+            "access_key_id": "$S3_ACCESS_KEY_ID",
+            "secret_access_key": "$S3_SECRET_ACCESS_KEY",
+            "session_token": null
+        }
+    }
+}
+AUTHEOF
+    export RATTLER_AUTH_FILE="$AUTH_FILE"
+
+    # Export standard AWS env vars so the SDK credential chain finds them.
+    # rattler-build's S3 channel resolution uses the AWS SDK (not S3_* vars).
+    export AWS_ACCESS_KEY_ID="$S3_ACCESS_KEY_ID"
+    export AWS_SECRET_ACCESS_KEY="$S3_SECRET_ACCESS_KEY"
+    export AWS_DEFAULT_REGION="$S3_REGION"
+    export AWS_REGION="$S3_REGION"
+elif [[ "$CHANNEL_URL" == s3://* ]]; then
+    log_warn "S3 channel URL detected but S3 credentials not set — builds may fail to resolve deps"
+fi
+
+# ─────────────────────────────────────────────
+# Create channel_sources override for variant builds
+# ─────────────────────────────────────────────
+# variants.yaml has a static channel_sources. We override it with the
+# configured channel URL. Later -m files override earlier ones.
+CHANNEL_OVERRIDE="/tmp/channel_override.yaml"
+cat > "$CHANNEL_OVERRIDE" <<CHEOF
+channel_sources:
+  - "$CHANNEL_URL,conda-forge,nvidia"
+CHEOF
+
 # Upload all .conda files from the output directory that are newer than the marker
 upload_packages() {
   local pkg_count=0
   for pkg in $(find "$OUTPUT_DIR" -name "*.conda" -newer "$REPO_ROOT/.build_marker" 2>/dev/null); do
-    log_info "Uploading: $(basename "$pkg")"
-    rattler-build upload prefix -c "$CHANNEL" "$pkg" --skip-existing
+    log_info "Publishing: $(basename "$pkg")"
+    rattler-build publish "$pkg" --to "s3://$S3_BUCKET"
     pkg_count=$((pkg_count + 1))
   done
   if [ "$pkg_count" -eq 0 ]; then
     log_warn "No new packages to upload"
   else
-    log_info "Uploaded $pkg_count package(s)"
+    log_info "Published $pkg_count package(s)"
   fi
 }
 
@@ -70,10 +125,12 @@ build_variants() {
   local recipe_dir="$2"
 
   log_info "Building variant package: $name (Python x CUDA matrix)"
+  # Variant builds get channels from channel_sources in the -m files.
+  # Using -c flags here would conflict with channel_sources.
   rattler-build build \
     -r "$recipe_dir" \
     -m "$VARIANT_CONFIG" \
-    "${CHANNELS[@]}" \
+    -m "$CHANNEL_OVERRIDE" \
     --output-dir "$OUTPUT_DIR" \
     --skip-existing local
 
@@ -128,7 +185,8 @@ mkdir -p "$OUTPUT_DIR"
 log_info "=== wv-forge Package Builder ==="
 log_info "Variant config: $VARIANT_CONFIG"
 log_info "Output dir: $OUTPUT_DIR"
-log_info "Upload channel: $PREFIX_URL/$CHANNEL"
+log_info "Channel: $CHANNEL_URL"
+log_info "Upload target: s3://$S3_BUCKET (region: $S3_REGION)"
 if [ ${#BUILD_ONLY[@]} -gt 0 ]; then
   log_info "Building only: ${BUILD_ONLY[*]}"
 fi
@@ -176,4 +234,4 @@ build_level "5 - sam3d-objects" \
 
 echo ""
 log_info "=== All builds complete ==="
-log_info "Packages available at: $PREFIX_URL/$CHANNEL"
+log_info "Packages available at: s3://$S3_BUCKET"

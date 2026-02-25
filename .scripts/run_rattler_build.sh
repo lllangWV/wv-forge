@@ -3,10 +3,13 @@
 # with rattler-build. Invoked by build_locally.py.
 #
 # Environment variables (set by the Docker launcher):
-#   BUILD_PACKAGES    - Semicolon-delimited "type:name:recipe_dir" specs
-#   SCCACHE_ENABLED   - "1" to enable sccache, "0" to disable
-#   HOST_USER_ID      - UID of the host user (for output file ownership)
-#   BUILD_JOBS        - Max parallel compilation jobs (unset = all cores)
+#   BUILD_PACKAGES         - Semicolon-delimited "type:name:recipe_dir" specs
+#   SCCACHE_ENABLED        - "1" to enable sccache, "0" to disable
+#   HOST_USER_ID           - UID of the host user (for output file ownership)
+#   BUILD_JOBS             - Max parallel compilation jobs (unset = all cores)
+#   WV_FORGE_CHANNEL_URL   - Channel URL for deps (default: s3://wv-forge)
+#   S3_ACCESS_KEY_ID       - S3 access key (for S3 channel auth)
+#   S3_SECRET_ACCESS_KEY   - S3 secret key (for S3 channel auth)
 
 set -euo pipefail
 
@@ -15,9 +18,12 @@ VARIANT_CONFIG="$REPO/variants.yaml"
 OUTPUT_DIR="$REPO/output"
 CONDA_FORGE_PINNING="/opt/conda/conda_build_config.yaml"
 
+# Configurable channel URL
+CHANNEL_URL="${WV_FORGE_CHANNEL_URL:-s3://wv-forge/wv-forge}"
+
 # Channels for dependency resolution (order matters: our channel first)
 CHANNELS=(
-    "-c" "https://prefix.dev/wv-forge"
+    "-c" "$CHANNEL_URL"
     "-c" "conda-forge"
     "-c" "nvidia"
 )
@@ -47,7 +53,38 @@ rattler-build --version
 sccache --version
 
 # ─────────────────────────────────────────────
-# 2. Configure sccache
+# 2. Set up S3 authentication (if using S3 channel)
+# ─────────────────────────────────────────────
+if [[ "$CHANNEL_URL" == s3://* ]] && [ -n "${S3_ACCESS_KEY_ID:-}" ] && [ -n "${S3_SECRET_ACCESS_KEY:-}" ]; then
+    log_info "Setting up S3 authentication for channel: $CHANNEL_URL"
+    AUTH_FILE="/tmp/rattler_auth.json"
+    cat > "$AUTH_FILE" <<AUTHEOF
+{
+    "$CHANNEL_URL": {
+        "S3Credentials": {
+            "access_key_id": "$S3_ACCESS_KEY_ID",
+            "secret_access_key": "$S3_SECRET_ACCESS_KEY",
+            "session_token": null
+        }
+    }
+}
+AUTHEOF
+    export RATTLER_AUTH_FILE="$AUTH_FILE"
+    log_info "RATTLER_AUTH_FILE set to $AUTH_FILE"
+
+    # Export standard AWS env vars so the SDK credential chain finds them.
+    # rattler-build's S3 channel resolution uses the AWS SDK (not S3_* vars).
+    export AWS_ACCESS_KEY_ID="$S3_ACCESS_KEY_ID"
+    export AWS_SECRET_ACCESS_KEY="$S3_SECRET_ACCESS_KEY"
+    export AWS_DEFAULT_REGION="${S3_REGION:-us-east-2}"
+    export AWS_REGION="${S3_REGION:-us-east-2}"
+    log_info "AWS credentials and region configured for S3 channel access"
+elif [[ "$CHANNEL_URL" == s3://* ]]; then
+    log_warn "S3 channel URL detected but S3 credentials not set — builds may fail to resolve deps"
+fi
+
+# ─────────────────────────────────────────────
+# 3. Configure sccache
 # ─────────────────────────────────────────────
 if [ "${SCCACHE_ENABLED:-1}" = "1" ]; then
     log_info "Configuring sccache..."
@@ -64,7 +101,7 @@ else
 fi
 
 # ─────────────────────────────────────────────
-# 3. Limit compilation parallelism
+# 4. Limit compilation parallelism
 # ─────────────────────────────────────────────
 if [ -n "${BUILD_JOBS:-}" ]; then
     log_info "Limiting compilation to $BUILD_JOBS parallel job(s)"
@@ -74,7 +111,7 @@ if [ -n "${BUILD_JOBS:-}" ]; then
 fi
 
 # ─────────────────────────────────────────────
-# 4. Override virtual packages for GPU-less builds
+# 5. Override virtual packages for GPU-less builds
 # ─────────────────────────────────────────────
 # The __cuda virtual package represents the system CUDA driver. Since we build
 # inside Docker without a GPU, we must tell the solver to assume a driver is
@@ -84,7 +121,20 @@ export CONDA_OVERRIDE_CUDA="${CONDA_OVERRIDE_CUDA:-12.9}"
 log_info "CONDA_OVERRIDE_CUDA=${CONDA_OVERRIDE_CUDA}"
 
 # ─────────────────────────────────────────────
-# 5. Build each package
+# 6. Create channel_sources override for variant builds
+# ─────────────────────────────────────────────
+# variants.yaml has a static channel_sources. We override it with the
+# configured channel URL by creating a temp YAML that takes precedence
+# (later -m files override earlier ones).
+CHANNEL_OVERRIDE="/tmp/channel_override.yaml"
+cat > "$CHANNEL_OVERRIDE" <<CHEOF
+channel_sources:
+  - "$CHANNEL_URL,conda-forge,nvidia"
+CHEOF
+log_info "Channel override: $CHANNEL_URL,conda-forge,nvidia"
+
+# ─────────────────────────────────────────────
+# 7. Build each package
 # ─────────────────────────────────────────────
 mkdir -p "$OUTPUT_DIR"
 
@@ -125,12 +175,13 @@ for pkg_spec in "${PACKAGES[@]}"; do
                 || BUILD_OK=false
             ;;
         variant)
-            # Variant builds get channels from channel_sources in variants.yaml
-            # (overrides conda-forge-pinning). Using -c flags here would conflict.
+            # Variant builds get channels from channel_sources in the -m files.
+            # The channel_override file overrides variants.yaml's static value.
             rattler-build build \
                 "${COMMON_ARGS[@]}" \
                 -m "$CONDA_FORGE_PINNING" \
                 -m "$VARIANT_CONFIG" \
+                -m "$CHANNEL_OVERRIDE" \
                 || BUILD_OK=false
             ;;
         standard)
@@ -154,7 +205,7 @@ for pkg_spec in "${PACKAGES[@]}"; do
 done
 
 # ─────────────────────────────────────────────
-# 6. Fix output file ownership
+# 8. Fix output file ownership
 # ─────────────────────────────────────────────
 if [ -n "${HOST_USER_ID:-}" ] && [ "$HOST_USER_ID" != "0" ]; then
     log_info "Fixing output file ownership (uid=$HOST_USER_ID)..."
@@ -162,7 +213,7 @@ if [ -n "${HOST_USER_ID:-}" ] && [ "$HOST_USER_ID" != "0" ]; then
 fi
 
 # ─────────────────────────────────────────────
-# 7. Report
+# 9. Report
 # ─────────────────────────────────────────────
 if [ "${SCCACHE_ENABLED:-1}" = "1" ]; then
     echo ""

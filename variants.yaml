@@ -11,7 +11,7 @@
 # rattler-build errors if both channel_sources (from -m config) and -c flags are set,
 # so variant builds rely on this instead of -c flags.
 channel_sources:
-  - "https://prefix.dev/wv-forge,conda-forge,nvidia"
+  - "s3://wv-forge/wv-forge,conda-forge,nvidia"
 
 python:
   - "3.12"

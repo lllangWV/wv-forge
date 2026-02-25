@@ -17,9 +17,17 @@ platforms = [
 build-cloudcompare = "rattler-build build -r src/cloudcompare/recipe.yaml -c conda-forge"
 
 [tasks.upload]
-description = "Upload packages to prefix.dev (skips already-uploaded by default)"
-cmd = "python scripts/upload_to_prefix.py {{ flags }}"
+description = "Upload packages to S3 channel"
+cmd = "python scripts/upload_to_s3.py {{ flags }}"
 args = [{ arg = "flags", default = "--all" }]
+
+[tasks.upload-force]
+description = "Upload packages to S3 channel, overwriting existing"
+cmd = "python scripts/upload_to_s3.py --all --force"
+
+[tasks.init-channel]
+description = "Initialize S3 channel with empty repodata (run once before first build)"
+cmd = "python scripts/init_s3_channel.py"
 
 
 
@@ -42,6 +50,7 @@ networkx = "2.4.*"
 rattler-build-conda-compat = ">=1.2.0,<2.0.0a0"
 requests = ">=2.28"
 python-dotenv = ">=1.0"
+awscli = ">=1.30"
 
 [feature.build.tasks.build]
 description = "Build packages in Docker with rattler-build (default: --all)"

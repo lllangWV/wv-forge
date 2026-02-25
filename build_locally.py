@@ -26,6 +26,11 @@ from argparse import ArgumentParser
 from dataclasses import dataclass
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
 DOCKER_IMAGE_DEFAULT = "quay.io/condaforge/linux-anvil-x86_64:alma9"
 CONTAINER_REPO = "/home/conda/wv-forge"
 CONTAINER_SCRIPT = f"{CONTAINER_REPO}/.scripts/run_rattler_build.sh"
@@ -271,6 +276,12 @@ def build_docker_command(
     if cuda_override:
         cmd.extend(["-e", f"CONDA_OVERRIDE_CUDA={cuda_override}"])
 
+    # Forward channel and S3 config so the container can resolve deps and auth
+    for env_var in ("WV_FORGE_CHANNEL_URL", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "S3_REGION"):
+        val = os.environ.get(env_var)
+        if val:
+            cmd.extend(["-e", f"{env_var}={val}"])
+
     # Image and command
     cmd.append(docker_image)
     cmd.extend(["bash", CONTAINER_SCRIPT])
@@ -320,11 +331,11 @@ def main():
     )
     parser.add_argument(
         "--no-upload", action="store_true",
-        help="Skip uploading packages to prefix.dev after build",
+        help="Skip uploading packages to S3 after build",
     )
     parser.add_argument(
         "--force", "-f", action="store_true",
-        help="Overwrite existing packages on prefix.dev during upload",
+        help="Overwrite existing packages on S3 during upload",
     )
 
     args = parser.parse_args()
@@ -442,10 +453,10 @@ def main():
     if result.returncode != 0:
         sys.exit(result.returncode)
 
-    # Upload packages to prefix.dev
+    # Upload packages to S3
     if not args.no_upload:
-        print(f"\n{GREEN}Uploading packages to prefix.dev/wv-forge...{NC}\n")
-        upload_script = repo_root / "scripts" / "upload_to_prefix.py"
+        print(f"\n{GREEN}Uploading packages to S3...{NC}\n")
+        upload_script = repo_root / "scripts" / "upload_to_s3.py"
         upload_cmd = [sys.executable, str(upload_script), "--all", "--output-dir", str(output_dir)]
         if args.force:
             upload_cmd.append("--force")

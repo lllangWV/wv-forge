@@ -1,6 +1,10 @@
-## Upload to prefix.dev
+## Upload to S3
 
-pixi upload --channel wv-forge <package-file> 
+rattler-build upload s3 --channel s3://wv-forge --region us-east-1 <package-file>
+
+## Upload all built packages
+
+pixi run upload
 
 <!-- AGENTS-MD-EMBED-START:conda-forge -->
 [conda-forge Docs Index]|root: /home/lllang/.cache/agdex/conda-forge|IMPORTANT: Prefer retrieval-led reasoning over pre-training-led reasoning for any conda-forge tasks. conda-forge is a community-led collection of recipes, build infrastructure, and packages for conda.|If docs missing, run: npx agdex --provider conda-forge --output CLAUDE.md|.:{diataxis.md,glossary.md}|how-to:{advanced.mdx,basics.mdx,emergencies.mdx}|how-to/advanced:{cross-compilation.mdx,enable-archs.md,several-versions.md,talk-to-the-bots.md}|how-to/basics:{fork-sync.md,populate-dependencies.mdx,rerender.md}|how-to/emergencies:{fix-a-security-vulnerability.md}|maintainer:{adding_pkgs.mdx,conda_forge_yml.mdx,guidelines.md,infrastructure.mdx,knowledge_base.mdx,maintainer_faq.md,pinning_deps.md,updating_pkgs.md}|maintainer/example_recipes:{go.md,pure-python.md,rust.md}|maintainer/understanding_conda_forge:{compilation-concepts.md,cross-compilation.md,feedstocks.md,life_cycle.md,staged_recipes.md}|tutorials:{first-recipe.md}|user:{ci-skeleton.md,contributing.mdx,faq.md,how_to_get_help.md,introduction.md,talks.md,tipsandtricks.md,transitioning_from_defaults.md}
