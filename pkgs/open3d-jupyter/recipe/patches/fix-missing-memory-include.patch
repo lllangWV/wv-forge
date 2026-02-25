@@ -1,0 +1,11 @@
+--- a/cpp/open3d/visualization/rendering/Renderer.h
++++ b/cpp/open3d/visualization/rendering/Renderer.h
+@@ -7,6 +7,8 @@
+
+ #pragma once
+
++#include <memory>
++
+ #include "open3d/visualization/rendering/MaterialModifier.h"
+ #include "open3d/visualization/rendering/RendererHandle.h"
+

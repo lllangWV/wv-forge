@@ -1,0 +1,1149 @@
+diff --git a/3rdparty/pybind11/pybind11.cmake b/3rdparty/pybind11/pybind11.cmake
+index 1d3d7856203..cf8c157f6b0 100644
+--- a/3rdparty/pybind11/pybind11.cmake
++++ b/3rdparty/pybind11/pybind11.cmake
+@@ -3,8 +3,8 @@ include(FetchContent)
+ FetchContent_Declare(
+     ext_pybind11
+     PREFIX pybind11
+-    URL https://github.com/pybind/pybind11/archive/refs/tags/v2.13.1.tar.gz
+-    URL_HASH SHA256=51631e88960a8856f9c497027f55c9f2f9115cafb08c0005439838a05ba17bfc
++    URL https://github.com/pybind/pybind11/archive/refs/tags/v3.0.0.tar.gz
++    URL_HASH SHA256=453b1a3e2b266c3ae9da872411cadb6d693ac18063bd73226d96cfb7015a200c
+     DOWNLOAD_DIR "${OPEN3D_THIRD_PARTY_DOWNLOAD_DIR}/pybind11"
+ )
+ 
+diff --git a/cpp/pybind/camera/camera.cpp b/cpp/pybind/camera/camera.cpp
+index 442ca803add..840ac047963 100644
+--- a/cpp/pybind/camera/camera.cpp
++++ b/cpp/pybind/camera/camera.cpp
+@@ -21,9 +21,10 @@ void pybind_camera_declarations(py::module &m) {
+             "PinholeCameraIntrinsic class stores intrinsic camera matrix, and "
+             "image height and width.");
+     // open3d.camera.PinholeCameraIntrinsicParameters
+-    py::enum_<PinholeCameraIntrinsicParameters> pinhole_intr_params(
+-            m_camera, "PinholeCameraIntrinsicParameters", py::arithmetic(),
+-            "PinholeCameraIntrinsicParameters");
++    py::native_enum<PinholeCameraIntrinsicParameters> pinhole_intr_params(
++            m_camera, "PinholeCameraIntrinsicParameters", "enum.Enum",
++            "Enum class that contains default camera intrinsic parameters for "
++            "different sensors.");
+     pinhole_intr_params
+             .value("PrimeSenseDefault",
+                    PinholeCameraIntrinsicParameters::PrimeSenseDefault,
+@@ -36,13 +37,8 @@ void pybind_camera_declarations(py::module &m) {
+                    PinholeCameraIntrinsicParameters::Kinect2ColorCameraDefault,
+                    "Default camera intrinsic parameter for Kinect2 color "
+                    "camera.")
+-            .export_values();
+-    pinhole_intr_params.attr("__doc__") = docstring::static_property(
+-            py::cpp_function([](py::handle arg) -> std::string {
+-                return "Enum class that contains default camera intrinsic "
+-                       "parameters for different sensors.";
+-            }),
+-            py::none(), py::none(), "");
++            .export_values()
++            .finalize();
+     py::class_<PinholeCameraParameters> pinhole_param(
+             m_camera, "PinholeCameraParameters",
+             "Contains both intrinsic and extrinsic pinhole camera parameters.");
+diff --git a/cpp/pybind/core/device.cpp b/cpp/pybind/core/device.cpp
+index b0a97f42c59..0e3e3185f5c 100644
+--- a/cpp/pybind/core/device.cpp
++++ b/cpp/pybind/core/device.cpp
+@@ -18,10 +18,11 @@ void pybind_core_device_declarations(py::module &m) {
+     py::class_<Device> device(
+             m, "Device",
+             "Device context specifying device type and device id.");
+-    py::enum_<Device::DeviceType>(device, "DeviceType")
++    py::native_enum<Device::DeviceType>(device, "DeviceType", "enum.Enum")
+             .value("CPU", Device::DeviceType::CPU)
+             .value("CUDA", Device::DeviceType::CUDA)
+-            .export_values();
++            .export_values()
++            .finalize();
+ }
+ void pybind_core_device_definitions(py::module &m) {
+     auto device = static_cast<py::class_<Device>>(m.attr("Device"));
+diff --git a/cpp/pybind/core/dtype.cpp b/cpp/pybind/core/dtype.cpp
+index f6e87aa11e9..301e50929bb 100644
+--- a/cpp/pybind/core/dtype.cpp
++++ b/cpp/pybind/core/dtype.cpp
+@@ -18,13 +18,14 @@ namespace core {
+ void pybind_core_dtype_declarations(py::module &m) {
+     py::class_<Dtype, std::shared_ptr<Dtype>> dtype(m, "Dtype",
+                                                     "Open3D data types.");
+-    py::enum_<Dtype::DtypeCode>(dtype, "DtypeCode")
++    py::native_enum<Dtype::DtypeCode>(dtype, "DtypeCode", "enum.Enum")
+             .value("Undefined", Dtype::DtypeCode::Undefined)
+             .value("Bool", Dtype::DtypeCode::Bool)
+             .value("Int", Dtype::DtypeCode::Int)
+             .value("UInt", Dtype::DtypeCode::UInt)
+             .value("Float", Dtype::DtypeCode::Float)
+-            .value("Object", Dtype::DtypeCode::Object);
++            .value("Object", Dtype::DtypeCode::Object)
++            .finalize();
+ }
+ void pybind_core_dtype_definitions(py::module &m) {
+     // open3d.core.Dtype class
+diff --git a/cpp/pybind/core/tensor_accessor.cpp b/cpp/pybind/core/tensor_accessor.cpp
+index 15b028bb78c..fe70982e55c 100644
+--- a/cpp/pybind/core/tensor_accessor.cpp
++++ b/cpp/pybind/core/tensor_accessor.cpp
+@@ -78,8 +78,8 @@ static TensorKey ToTensorKey(const Tensor& key_tensor) {
+     }
+ }
+ 
+-/// Convert supported types to TensorKey. Infer types via type name and dynamic
+-/// casting. Supported types:
++/// Convert supported types to TensorKey.
++/// Supported types:
+ /// 1) int
+ /// 2) slice
+ /// 3) list
+@@ -87,30 +87,27 @@ static TensorKey ToTensorKey(const Tensor& key_tensor) {
+ /// 5) numpy.ndarray
+ /// 6) Tensor
+ static TensorKey PyHandleToTensorKey(const py::handle& item) {
+-    // Infer types from type name and dynamic casting.
+-    // See: https://github.com/pybind/pybind11/issues/84.
+-    std::string class_name(py::str(item.get_type()));
+-    if (class_name == "<class 'int'>") {
+-        return ToTensorKey(static_cast<int64_t>(item.cast<py::int_>()));
+-    } else if (class_name == "<class 'slice'>") {
+-        return ToTensorKey(item.cast<py::slice>());
+-    } else if (class_name == "<class 'list'>") {
+-        return ToTensorKey(item.cast<py::list>());
+-    } else if (class_name == "<class 'tuple'>") {
+-        return ToTensorKey(item.cast<py::tuple>());
+-    } else if (class_name == "<class 'numpy.ndarray'>") {
+-        return ToTensorKey(item.cast<py::array>());
+-    } else if (class_name.find("open3d") != std::string::npos &&
+-               class_name.find("Tensor") != std::string::npos) {
++    if (py::isinstance<py::int_>(item)) {
++        return ToTensorKey(
++                static_cast<int64_t>(py::reinterpret_borrow<py::int_>(item)));
++    } else if (py::isinstance<py::slice>(item)) {
++        return ToTensorKey(py::reinterpret_borrow<py::slice>(item));
++    } else if (py::isinstance<py::list>(item)) {
++        return ToTensorKey(py::reinterpret_borrow<py::list>(item));
++    } else if (py::isinstance<py::tuple>(item)) {
++        return ToTensorKey(py::reinterpret_borrow<py::tuple>(item));
++    } else if (py::isinstance<py::array>(item)) {
++        return ToTensorKey(py::reinterpret_borrow<py::array>(item));
++    } else if (py::isinstance<Tensor>(item)) {
+         try {
+-            Tensor* tensor = item.cast<Tensor*>();
+-            return ToTensorKey(*tensor);
++            return ToTensorKey(*item.cast<Tensor*>());
+         } catch (...) {
+             utility::LogError("Cannot cast index to Tensor.");
+         }
+     } else {
+-        utility::LogError("PyHandleToTensorKey has invalid key type {}.",
+-                          class_name);
++        utility::LogError(
++                "PyHandleToTensorKey has invalid key type {}.",
++                static_cast<std::string>(py::str(py::type::of(item))));
+     }
+ }
+ 
+diff --git a/cpp/pybind/core/tensor_converter.cpp b/cpp/pybind/core/tensor_converter.cpp
+index ea3e2ff4f45..e2115e3eb2d 100644
+--- a/cpp/pybind/core/tensor_converter.cpp
++++ b/cpp/pybind/core/tensor_converter.cpp
+@@ -197,26 +197,30 @@ Tensor PyHandleToTensor(const py::handle& handle,
+     // 5) tuple
+     // 6) numpy.ndarray (value will be copied)
+     // 7) Tensor (value will be copied)
+-    std::string class_name(py::str(handle.get_type()));
+-    if (class_name == "<class 'bool'>") {
+-        return BoolToTensor(static_cast<bool>(handle.cast<py::bool_>()), dtype,
+-                            device);
+-    } else if (class_name == "<class 'int'>") {
+-        return IntToTensor(static_cast<int64_t>(handle.cast<py::int_>()), dtype,
+-                           device);
+-    } else if (class_name == "<class 'float'>") {
+-        return DoubleToTensor(static_cast<double>(handle.cast<py::float_>()),
+-                              dtype, device);
+-    } else if (class_name == "<class 'list'>") {
+-        return PyListToTensor(handle.cast<py::list>(), dtype, device);
+-    } else if (class_name == "<class 'tuple'>") {
+-        return PyTupleToTensor(handle.cast<py::tuple>(), dtype, device);
+-    } else if (class_name == "<class 'numpy.ndarray'>") {
+-        return CastOptionalDtypeDevice(PyArrayToTensor(handle.cast<py::array>(),
+-                                                       /*inplace=*/!force_copy),
+-                                       dtype, device);
+-    } else if (class_name.find("open3d") != std::string::npos &&
+-               class_name.find("Tensor") != std::string::npos) {
++    if (py::isinstance<py::bool_>(handle)) {
++        return BoolToTensor(
++                static_cast<bool>(py::reinterpret_borrow<py::bool_>(handle)),
++                dtype, device);
++    } else if (py::isinstance<py::int_>(handle)) {
++        return IntToTensor(
++                static_cast<int64_t>(py::reinterpret_borrow<py::int_>(handle)),
++                dtype, device);
++    } else if (py::isinstance<py::float_>(handle)) {
++        return DoubleToTensor(
++                static_cast<double>(py::reinterpret_borrow<py::float_>(handle)),
++                dtype, device);
++    } else if (py::isinstance<py::list>(handle)) {
++        return PyListToTensor(py::reinterpret_borrow<py::list>(handle), dtype,
++                              device);
++    } else if (py::isinstance<py::tuple>(handle)) {
++        return PyTupleToTensor(py::reinterpret_borrow<py::tuple>(handle), dtype,
++                               device);
++    } else if (py::isinstance<py::array>(handle)) {
++        return CastOptionalDtypeDevice(
++                PyArrayToTensor(py::reinterpret_borrow<py::array>(handle),
++                                /*inplace=*/!force_copy),
++                dtype, device);
++    } else if (py::isinstance<Tensor>(handle)) {
+         try {
+             Tensor* tensor = handle.cast<Tensor*>();
+             if (force_copy) {
+@@ -228,8 +232,9 @@ Tensor PyHandleToTensor(const py::handle& handle,
+             utility::LogError("Cannot cast index to Tensor.");
+         }
+     } else {
+-        utility::LogError("PyHandleToTensor has invalid input type {}.",
+-                          class_name);
++        utility::LogError(
++                "PyHandleToTensor has invalid input type {}.",
++                static_cast<std::string>(py::str(py::type::of(handle))));
+     }
+ }
+ 
+diff --git a/cpp/pybind/core/tensor_type_caster.cpp b/cpp/pybind/core/tensor_type_caster.cpp
+index cb69fddfef0..d48194414c7 100644
+--- a/cpp/pybind/core/tensor_type_caster.cpp
++++ b/cpp/pybind/core/tensor_type_caster.cpp
+@@ -19,11 +19,9 @@ bool type_caster<open3d::core::Tensor>::load(handle src, bool convert) {
+     }
+ 
+     if (convert) {
+-        std::string class_name(py::str(src.get_type()));
+-        if (class_name == "<class 'bool'>" || class_name == "<class 'int'>" ||
+-            class_name == "<class 'float'>" || class_name == "<class 'list'>" ||
+-            class_name == "<class 'tuple'>" ||
+-            class_name == "<class 'numpy.ndarray'>") {
++        if (py::isinstance<py::bool_>(src) || py::isinstance<py::int_>(src) ||
++            py::isinstance<py::float_>(src) || py::isinstance<py::list>(src) ||
++            py::isinstance<py::tuple>(src) || py::isinstance<py::array>(src)) {
+             holder_ = std::make_unique<open3d::core::Tensor>(
+                     open3d::core::PyHandleToTensor(src));
+             value = holder_.get();
+diff --git a/cpp/pybind/docstring.cpp b/cpp/pybind/docstring.cpp
+index e9d03711d35..3edb5fecac0 100644
+--- a/cpp/pybind/docstring.cpp
++++ b/cpp/pybind/docstring.cpp
+@@ -138,8 +138,9 @@ size_t FunctionDoc::ParseSummary() {
+         overload_docs_.push_back(OverloadDocs{});
+         size_t result_type_pos = arrow_pos + 4;
+         size_t summary_start_pos =
+-                result_type_pos +
+-                utility::WordLength(pybind_doc_, result_type_pos, "._:,[]() ,");
++                result_type_pos + utility::WordLength(pybind_doc_,
++                                                      result_type_pos,
++                                                      "._:,[]() ,\"");
+         summary_end_pos =
+                 pybind_doc_.find(". " + name_ + "(", summary_start_pos);
+         if (summary_end_pos == std::string::npos)
+@@ -177,7 +178,7 @@ void FunctionDoc::ParseReturn() {
+         std::string return_type = pybind_doc_.substr(
+                 result_type_pos,
+                 utility::WordLength(pybind_doc_, result_type_pos,
+-                                    "._:,[]() ,"));
++                                    "._:,[]() ,\""));
+         overload_docs_.back().return_doc_.type_ = StringCleanAll(return_type);
+     }
+ }
+diff --git a/cpp/pybind/docstring.h b/cpp/pybind/docstring.h
+index 6a91681097a..cb3219d7daa 100644
+--- a/cpp/pybind/docstring.h
++++ b/cpp/pybind/docstring.h
+@@ -66,9 +66,6 @@ class FunctionDoc {
+     /// Generate Google style python docstring.
+     std::string ToGoogleDocString() const;
+ 
+-    /// Apply fixes to namespace, e.g. "::" to "." for python
+-    static std::string NamespaceFix(const std::string& s);
+-
+ protected:
+     /// Parse the function name from docstring.
+     ///
+diff --git a/cpp/pybind/geometry/geometry.cpp b/cpp/pybind/geometry/geometry.cpp
+index ce1c21fb7c5..7ed6a47507f 100644
+--- a/cpp/pybind/geometry/geometry.cpp
++++ b/cpp/pybind/geometry/geometry.cpp
+@@ -17,16 +17,9 @@ namespace geometry {
+ void pybind_geometry_classes_declarations(py::module &m) {
+     py::class_<Geometry, PyGeometry<Geometry>, std::shared_ptr<Geometry>>
+             geometry(m, "Geometry", "The base geometry class.");
+-    py::enum_<Geometry::GeometryType> geometry_type(geometry, "Type",
+-                                                    py::arithmetic());
+-    // Trick to write docs without listing the members in the enum class again.
+-    geometry_type.attr("__doc__") = docstring::static_property(
+-            py::cpp_function([](py::handle arg) -> std::string {
+-                return "Enum class for Geometry types.";
+-            }),
+-            py::none(), py::none(), "");
+-
+-    geometry_type.value("Unspecified", Geometry::GeometryType::Unspecified)
++    py::native_enum<Geometry::GeometryType>(geometry, "Type", "enum.Enum",
++                                            "Enum class for Geometry types.")
++            .value("Unspecified", Geometry::GeometryType::Unspecified)
+             .value("PointCloud", Geometry::GeometryType::PointCloud)
+             .value("VoxelGrid", Geometry::GeometryType::VoxelGrid)
+             .value("LineSet", Geometry::GeometryType::LineSet)
+@@ -36,7 +29,8 @@ void pybind_geometry_classes_declarations(py::module &m) {
+             .value("Image", Geometry::GeometryType::Image)
+             .value("RGBDImage", Geometry::GeometryType::RGBDImage)
+             .value("TetraMesh", Geometry::GeometryType::TetraMesh)
+-            .export_values();
++            .export_values()
++            .finalize();
+     py::class_<Geometry3D, PyGeometry3D<Geometry3D>,
+                std::shared_ptr<Geometry3D>, Geometry>
+             geometry3d(m, "Geometry3D",
+diff --git a/cpp/pybind/geometry/image.cpp b/cpp/pybind/geometry/image.cpp
+index c53336b8068..d2490855263 100644
+--- a/cpp/pybind/geometry/image.cpp
++++ b/cpp/pybind/geometry/image.cpp
+@@ -38,18 +38,15 @@ static const std::unordered_map<std::string, std::string>
+                  "by a 3x3 Gaussian kernel before downsampling."}};
+ 
+ void pybind_image_declarations(py::module &m) {
+-    py::enum_<Image::FilterType> image_filter_type(m, "ImageFilterType");
+-    image_filter_type.value("Gaussian3", Image::FilterType::Gaussian3)
++    py::native_enum<Image::FilterType>(m, "ImageFilterType", "enum.Enum",
++                                       "Enum class for Image filter types.")
++            .value("Gaussian3", Image::FilterType::Gaussian3)
+             .value("Gaussian5", Image::FilterType::Gaussian5)
+             .value("Gaussian7", Image::FilterType::Gaussian7)
+             .value("Sobel3dx", Image::FilterType::Sobel3Dx)
+             .value("Sobel3dy", Image::FilterType::Sobel3Dy)
+-            .export_values();
+-    image_filter_type.attr("__doc__") = docstring::static_property(
+-            py::cpp_function([](py::handle arg) -> std::string {
+-                return "Enum class for Image filter types.";
+-            }),
+-            py::none(), py::none(), "");
++            .export_values()
++            .finalize();
+     py::class_<Image, PyGeometry2D<Image>, std::shared_ptr<Image>, Geometry2D>
+             image(m, "Image", py::buffer_protocol(),
+                   "The image class stores image with customizable width, "
+diff --git a/cpp/pybind/geometry/kdtreeflann.cpp b/cpp/pybind/geometry/kdtreeflann.cpp
+index 23e55e11861..d7ac3755d66 100644
+--- a/cpp/pybind/geometry/kdtreeflann.cpp
++++ b/cpp/pybind/geometry/kdtreeflann.cpp
+@@ -18,18 +18,14 @@ void pybind_kdtreeflann_declarations(py::module &m) {
+     py::class_<KDTreeSearchParam> kdtreesearchparam(
+             m, "KDTreeSearchParam", "Base class for KDTree search parameters.");
+     // open3d.geometry.KDTreeSearchParam.Type
+-    py::enum_<KDTreeSearchParam::SearchType> kdtree_search_param_type(
+-            kdtreesearchparam, "Type", py::arithmetic());
+-    kdtree_search_param_type
++    py::native_enum<KDTreeSearchParam::SearchType>(
++            kdtreesearchparam, "Type", "enum.Enum",
++            "Enum class for Geometry types.")
+             .value("KNNSearch", KDTreeSearchParam::SearchType::Knn)
+             .value("RadiusSearch", KDTreeSearchParam::SearchType::Radius)
+             .value("HybridSearch", KDTreeSearchParam::SearchType::Hybrid)
+-            .export_values();
+-    kdtree_search_param_type.attr("__doc__") = docstring::static_property(
+-            py::cpp_function([](py::handle arg) -> std::string {
+-                return "Enum class for Geometry types.";
+-            }),
+-            py::none(), py::none(), "");
++            .export_values()
++            .finalize();
+     py::class_<KDTreeSearchParamKNN> kdtreesearchparam_knn(
+             m, "KDTreeSearchParamKNN", kdtreesearchparam,
+             "KDTree search parameters for pure KNN search.");
+diff --git a/cpp/pybind/geometry/meshbase.cpp b/cpp/pybind/geometry/meshbase.cpp
+index 1f7657202df..69304c63551 100644
+--- a/cpp/pybind/geometry/meshbase.cpp
++++ b/cpp/pybind/geometry/meshbase.cpp
+@@ -22,15 +22,18 @@ void pybind_meshbase_declarations(py::module &m) {
+                      "MeshBase class. Triangle mesh contains vertices. "
+                      "Optionally, the mesh "
+                      "may also contain vertex normals and vertex colors.");
+-    py::enum_<MeshBase::SimplificationContraction>(m,
+-                                                   "SimplificationContraction")
++    py::native_enum<MeshBase::SimplificationContraction>(
++            m, "SimplificationContraction", "enum.Enum",
++            "Method for mesh simplification contraction.")
+             .value("Average", MeshBase::SimplificationContraction::Average,
+                    "The vertex positions are computed by the averaging.")
+             .value("Quadric", MeshBase::SimplificationContraction::Quadric,
+                    "The vertex positions are computed by minimizing the "
+                    "distance to the adjacent triangle planes.")
+-            .export_values();
+-    py::enum_<MeshBase::FilterScope>(m, "FilterScope")
++            .export_values()
++            .finalize();
++    py::native_enum<MeshBase::FilterScope>(m, "FilterScope", "enum.Enum",
++                                           "Scope for mesh filtering.")
+             .value("All", MeshBase::FilterScope::All,
+                    "All properties (color, normal, vertex position) are "
+                    "filtered.")
+@@ -40,16 +43,19 @@ void pybind_meshbase_declarations(py::module &m) {
+                    "Only the normal values are filtered.")
+             .value("Vertex", MeshBase::FilterScope::Vertex,
+                    "Only the vertex positions are filtered.")
+-            .export_values();
+-    py::enum_<MeshBase::DeformAsRigidAsPossibleEnergy>(
+-            m, "DeformAsRigidAsPossibleEnergy")
++            .export_values()
++            .finalize();
++    py::native_enum<MeshBase::DeformAsRigidAsPossibleEnergy>(
++            m, "DeformAsRigidAsPossibleEnergy", "enum.Enum",
++            "Energy model for the as-rigid-as-possible mesh deformation.")
+             .value("Spokes", MeshBase::DeformAsRigidAsPossibleEnergy::Spokes,
+-                   "is the original energy as formulated in orkine and Alexa, "
++                   "Is the original energy as formulated in orkine and Alexa, "
+                    "\"As-Rigid-As-Possible Surface Modeling\", 2007.")
+             .value("Smoothed",
+                    MeshBase::DeformAsRigidAsPossibleEnergy::Smoothed,
+-                   "adds a rotation smoothing term to the rotations.")
+-            .export_values();
++                   "Adds a rotation smoothing term to the rotations.")
++            .export_values()
++            .finalize();
+ }
+ 
+ void pybind_meshbase_definitions(py::module &m) {
+diff --git a/cpp/pybind/geometry/voxelgrid.cpp b/cpp/pybind/geometry/voxelgrid.cpp
+index 6d9f203ee55..d0ce7ed7fea 100644
+--- a/cpp/pybind/geometry/voxelgrid.cpp
++++ b/cpp/pybind/geometry/voxelgrid.cpp
+@@ -64,13 +64,14 @@ void pybind_voxelgrid_definitions(py::module &m) {
+                                    std::shared_ptr<VoxelGrid>, Geometry3D>>(
+                     m.attr("VoxelGrid"));
+ 
+-    py::enum_<VoxelGrid::VoxelPoolingMode> pooling_mode(
+-            voxelgrid, "VoxelPoolingMode",
++    py::native_enum<VoxelGrid::VoxelPoolingMode> pooling_mode(
++            voxelgrid, "VoxelPoolingMode", "enum.Enum",
+             "Mode of determining color for each voxel.");
+     pooling_mode.value("AVG", VoxelGrid::VoxelPoolingMode::AVG)
+             .value("MIN", VoxelGrid::VoxelPoolingMode::MIN)
+             .value("MAX", VoxelGrid::VoxelPoolingMode::MAX)
+-            .value("SUM", VoxelGrid::VoxelPoolingMode::SUM);
++            .value("SUM", VoxelGrid::VoxelPoolingMode::SUM)
++            .finalize();
+ 
+     py::detail::bind_default_constructor<VoxelGrid>(voxelgrid);
+     py::detail::bind_copy_functions<VoxelGrid>(voxelgrid);
+diff --git a/cpp/pybind/io/class_io.cpp b/cpp/pybind/io/class_io.cpp
+index e422af14654..ce4d1c0ea81 100644
+--- a/cpp/pybind/io/class_io.cpp
++++ b/cpp/pybind/io/class_io.cpp
+@@ -84,18 +84,14 @@ static const std::unordered_map<std::string, std::string>
+ };
+ 
+ void pybind_class_io_declarations(py::module &m_io) {
+-    py::enum_<FileGeometry> geom_type(m_io, "FileGeometry", py::arithmetic());
+-    // Trick to write docs without listing the members in the enum class again.
+-    geom_type.attr("__doc__") = docstring::static_property(
+-            py::cpp_function([](py::handle arg) -> std::string {
+-                return "Geometry types";
+-            }),
+-            py::none(), py::none(), "");
+-    geom_type.value("CONTENTS_UNKNOWN", FileGeometry::CONTENTS_UNKNOWN)
++    py::native_enum<FileGeometry>(m_io, "FileGeometry", "enum.IntFlag",
++                                  "Geometry types")
++            .value("CONTENTS_UNKNOWN", FileGeometry::CONTENTS_UNKNOWN)
+             .value("CONTAINS_POINTS", FileGeometry::CONTAINS_POINTS)
+             .value("CONTAINS_LINES", FileGeometry::CONTAINS_LINES)
+             .value("CONTAINS_TRIANGLES", FileGeometry::CONTAINS_TRIANGLES)
+-            .export_values();
++            .export_values()
++            .finalize();
+ }
+ void pybind_class_io_definitions(py::module &m_io) {
+     m_io.def(
+diff --git a/cpp/pybind/open3d_pybind.h b/cpp/pybind/open3d_pybind.h
+index f432092096a..8696a23885e 100644
+--- a/cpp/pybind/open3d_pybind.h
++++ b/cpp/pybind/open3d_pybind.h
+@@ -26,6 +26,7 @@
+ #include <pybind11/detail/internals.h>
+ #include <pybind11/eigen.h>
+ #include <pybind11/functional.h>
++#include <pybind11/native_enum.h>
+ #include <pybind11/numpy.h>
+ #include <pybind11/operators.h>
+ #include <pybind11/pybind11.h>  // Include first to suppress compiler warnings
+diff --git a/cpp/pybind/pipelines/integration/integration.cpp b/cpp/pybind/pipelines/integration/integration.cpp
+index ded304ce64f..ba47563e960 100644
+--- a/cpp/pybind/pipelines/integration/integration.cpp
++++ b/cpp/pybind/pipelines/integration/integration.cpp
+@@ -42,18 +42,14 @@ void pybind_integration_declarations(py::module &m) {
+     py::module m_integration =
+             m.def_submodule("integration", "Integration pipeline.");
+     // open3d.integration.TSDFVolumeColorType
+-    py::enum_<TSDFVolumeColorType> tsdf_volume_color_type(
+-            m_integration, "TSDFVolumeColorType", py::arithmetic());
+-    tsdf_volume_color_type.value("NoColor", TSDFVolumeColorType::NoColor)
++    py::native_enum<TSDFVolumeColorType>(m_integration, "TSDFVolumeColorType",
++                                         "enum.Enum",
++                                         "Enum class for TSDFVolumeColorType.")
++            .value("NoColor", TSDFVolumeColorType::NoColor)
+             .value("RGB8", TSDFVolumeColorType::RGB8)
+             .value("Gray32", TSDFVolumeColorType::Gray32)
+-            .export_values();
+-    // Trick to write docs without listing the members in the enum class again.
+-    tsdf_volume_color_type.attr("__doc__") = docstring::static_property(
+-            py::cpp_function([](py::handle arg) -> std::string {
+-                return "Enum class for TSDFVolumeColorType.";
+-            }),
+-            py::none(), py::none(), "");
++            .export_values()
++            .finalize();
+     py::class_<TSDFVolume, PyTSDFVolume<TSDFVolume>> tsdfvolume(
+             m_integration, "TSDFVolume", R"(Base class of the Truncated
+ Signed Distance Function (TSDF) volume This volume is usually used to integrate
+diff --git a/cpp/pybind/pybind_filesystem.h b/cpp/pybind/pybind_filesystem.h
+index d0854598fb6..990287b965f 100644
+--- a/cpp/pybind/pybind_filesystem.h
++++ b/cpp/pybind/pybind_filesystem.h
+@@ -99,7 +99,9 @@ struct path_caster {
+         return true;
+     }
+ 
+-    PYBIND11_TYPE_CASTER(T, const_name("os.PathLike"));
++    PYBIND11_TYPE_CASTER(T,
++                         io_name("Union[os.PathLike, str, bytes]",
++                                 "pathlib.Path"));
+ };
+ 
+ template <>
+diff --git a/cpp/pybind/t/geometry/geometry.cpp b/cpp/pybind/t/geometry/geometry.cpp
+index 5b1e3deccdf..fe200593da7 100644
+--- a/cpp/pybind/t/geometry/geometry.cpp
++++ b/cpp/pybind/t/geometry/geometry.cpp
+@@ -49,15 +49,16 @@ void pybind_geometry_declarations(py::module& m) {
+     py::module m_geometry = m.def_submodule(
+             "geometry", "Tensor-based geometry defining module.");
+ 
+-    py::enum_<Metric>(
+-            m_geometry, "Metric",
++    py::native_enum<Metric>(
++            m_geometry, "Metric", "enum.Enum",
+             "Enum for metrics for comparing point clouds and triangle meshes.")
+             .value("ChamferDistance", Metric::ChamferDistance,
+                    "Chamfer Distance")
+             .value("HausdorffDistance", Metric::HausdorffDistance,
+                    "Hausdorff Distance")
+             .value("FScore", Metric::FScore, "F-Score")
+-            .export_values();
++            .export_values()
++            .finalize();
+     py::class_<MetricParameters> metric_parameters(
+             m_geometry, "MetricParameters",
+             "Holder for various parameters required by metrics.");
+diff --git a/cpp/pybind/t/geometry/image.cpp b/cpp/pybind/t/geometry/image.cpp
+index 1d63432f1c6..a2278a1ef9f 100644
+--- a/cpp/pybind/t/geometry/image.cpp
++++ b/cpp/pybind/t/geometry/image.cpp
+@@ -58,13 +58,15 @@ void pybind_image_declarations(py::module &m) {
+             image(m, "Image", py::buffer_protocol(),
+                   "The Image class stores image with customizable rols, cols, "
+                   "channels, dtype and device.");
+-    py::enum_<Image::InterpType>(m, "InterpType", "Interpolation type.")
++    py::native_enum<Image::InterpType>(m, "InterpType", "enum.Enum",
++                                       "Interpolation type.")
+             .value("Nearest", Image::InterpType::Nearest)
+             .value("Linear", Image::InterpType::Linear)
+             .value("Cubic", Image::InterpType::Cubic)
+             .value("Lanczos", Image::InterpType::Lanczos)
+             .value("Super", Image::InterpType::Super)
+-            .export_values();
++            .export_values()
++            .finalize();
+     py::class_<RGBDImage, PyGeometry<RGBDImage>, std::shared_ptr<RGBDImage>,
+                Geometry>
+             rgbd_image(
+diff --git a/cpp/pybind/t/io/sensor.cpp b/cpp/pybind/t/io/sensor.cpp
+index d33f171446e..ac01b105080 100644
+--- a/cpp/pybind/t/io/sensor.cpp
++++ b/cpp/pybind/t/io/sensor.cpp
+@@ -66,9 +66,10 @@ class PyRGBDVideoReader : public RGBDVideoReader {
+ };
+ 
+ void pybind_sensor_declarations(py::module &m) {
+-    py::enum_<SensorType>(m, "SensorType", "Sensor type")
++    py::native_enum<SensorType>(m, "SensorType", "enum.Enum", "Sensor type")
+             .value("AZURE_KINECT", SensorType::AZURE_KINECT)
+-            .value("REAL_SENSE", SensorType::REAL_SENSE);
++            .value("REAL_SENSE", SensorType::REAL_SENSE)
++            .finalize();
+     py::class_<RGBDVideoMetadata> rgbd_video_metadata(m, "RGBDVideoMetadata",
+                                                       "RGBD Video metadata.");
+     py::class_<RGBDVideoReader, PyRGBDVideoReader,
+diff --git a/cpp/pybind/t/pipelines/odometry/odometry.cpp b/cpp/pybind/t/pipelines/odometry/odometry.cpp
+index 35886b5e554..3bf8c7efd5a 100644
+--- a/cpp/pybind/t/pipelines/odometry/odometry.cpp
++++ b/cpp/pybind/t/pipelines/odometry/odometry.cpp
+@@ -80,12 +80,13 @@ static const std::unordered_map<std::string, std::string>
+ void pybind_odometry_declarations(py::module &m) {
+     py::module m_odometry =
+             m.def_submodule("odometry", "Tensor odometry pipeline.");
+-    py::enum_<Method>(m_odometry, "Method",
+-                      "Tensor odometry estimation method.")
++    py::native_enum<Method>(m_odometry, "Method", "enum.Enum",
++                            "Tensor odometry estimation method.")
+             .value("PointToPlane", Method::PointToPlane)
+             .value("Intensity", Method::Intensity)
+             .value("Hybrid", Method::Hybrid)
+-            .export_values();
++            .export_values()
++            .finalize();
+     py::class_<OdometryConvergenceCriteria> odometry_convergence_criteria(
+             m_odometry, "OdometryConvergenceCriteria",
+             "Convergence criteria of odometry. "
+diff --git a/cpp/pybind/t/pipelines/registration/robust_kernel.cpp b/cpp/pybind/t/pipelines/registration/robust_kernel.cpp
+index 34d5a219b54..48615fef6ba 100644
+--- a/cpp/pybind/t/pipelines/registration/robust_kernel.cpp
++++ b/cpp/pybind/t/pipelines/registration/robust_kernel.cpp
+@@ -19,8 +19,9 @@ void pybind_robust_kernel_declarations(py::module& m) {
+     py::module m_robust_kernel = m.def_submodule(
+             "robust_kernel",
+             "Tensor-based robust kernel for outlier rejection.");
+-    py::enum_<RobustKernelMethod>(m_robust_kernel, "RobustKernelMethod",
+-                                  "Robust kernel method for outlier rejection.")
++    py::native_enum<RobustKernelMethod>(
++            m_robust_kernel, "RobustKernelMethod", "enum.Enum",
++            "Robust kernel method for outlier rejection.")
+             .value("L2Loss", RobustKernelMethod::L2Loss)
+             .value("L1Loss", RobustKernelMethod::L1Loss)
+             .value("HuberLoss", RobustKernelMethod::HuberLoss)
+@@ -28,7 +29,8 @@ void pybind_robust_kernel_declarations(py::module& m) {
+             .value("GMLoss", RobustKernelMethod::GMLoss)
+             .value("TukeyLoss", RobustKernelMethod::TukeyLoss)
+             .value("GeneralizedLoss", RobustKernelMethod::GeneralizedLoss)
+-            .export_values();
++            .export_values()
++            .finalize();
+     py::class_<RobustKernel> robust_kernel(m_robust_kernel, "RobustKernel",
+                                            R"(
+ Base class that models a robust kernel for outlier rejection. The virtual
+diff --git a/cpp/pybind/utility/logging.cpp b/cpp/pybind/utility/logging.cpp
+index eaaabb27616..d17ff8e66f3 100644
+--- a/cpp/pybind/utility/logging.cpp
++++ b/cpp/pybind/utility/logging.cpp
+@@ -14,19 +14,14 @@ namespace open3d {
+ namespace utility {
+ 
+ void pybind_logging_declarations(py::module& m) {
+-    py::enum_<VerbosityLevel> vl(m, "VerbosityLevel", py::arithmetic(),
+-                                 "VerbosityLevel");
+-    vl.value("Error", VerbosityLevel::Error)
++    py::native_enum<VerbosityLevel>(m, "VerbosityLevel", "enum.IntEnum",
++                                    "Enum class for VerbosityLevel.")
++            .value("Error", VerbosityLevel::Error)
+             .value("Warning", VerbosityLevel::Warning)
+             .value("Info", VerbosityLevel::Info)
+             .value("Debug", VerbosityLevel::Debug)
+-            .export_values();
+-    // Trick to write docs without listing the members in the enum class again.
+-    vl.attr("__doc__") = docstring::static_property(
+-            py::cpp_function([](py::handle arg) -> std::string {
+-                return "Enum class for VerbosityLevel.";
+-            }),
+-            py::none(), py::none(), "");
++            .export_values()
++            .finalize();
+     py::class_<VerbosityContextManager> verbosity_context_manager(
+             m, "VerbosityContextManager",
+             "A context manager to "
+diff --git a/cpp/pybind/visualization/gui/events.cpp b/cpp/pybind/visualization/gui/events.cpp
+index 62999d472ee..2051e1be3f1 100644
+--- a/cpp/pybind/visualization/gui/events.cpp
++++ b/cpp/pybind/visualization/gui/events.cpp
+@@ -16,36 +16,36 @@ namespace visualization {
+ namespace gui {
+ 
+ void pybind_gui_events_declarations(py::module& m_gui) {
+-    py::enum_<MouseButton> buttons(
+-            m_gui, "MouseButton", "Mouse button identifiers", py::arithmetic());
+-    buttons.value("NONE", MouseButton::NONE)
++    py::native_enum<MouseButton>(m_gui, "MouseButton", "enum.IntFlag",
++                                 "Mouse button identifiers")
++            .value("NONE", MouseButton::NONE)
+             .value("LEFT", MouseButton::LEFT)
+             .value("MIDDLE", MouseButton::MIDDLE)
+             .value("RIGHT", MouseButton::RIGHT)
+             .value("BUTTON4", MouseButton::BUTTON4)
+             .value("BUTTON5", MouseButton::BUTTON5)
+-            .export_values();
+-    py::enum_<KeyModifier> key_mod(
+-            m_gui, "KeyModifier", "Key modifier identifiers", py::arithmetic());
+-    key_mod.value("NONE", KeyModifier::NONE)
++            .finalize();
++    py::native_enum<KeyModifier>(m_gui, "KeyModifier", "enum.IntFlag",
++                                 "Key modifier identifiers")
++            .value("NONE", KeyModifier::NONE)
+             .value("SHIFT", KeyModifier::SHIFT)
+             .value("CTRL", KeyModifier::CTRL)
+             .value("ALT", KeyModifier::ALT)
+             .value("META", KeyModifier::META)
+-            .export_values();
++            .finalize();
+     py::class_<MouseEvent> mouse_event(m_gui, "MouseEvent",
+                                        "Object that stores mouse events");
+-    py::enum_<MouseEvent::Type> mouse_event_type(mouse_event, "Type",
+-                                                 py::arithmetic());
+-    mouse_event_type.value("MOVE", MouseEvent::Type::MOVE)
++    py::native_enum<MouseEvent::Type>(mouse_event, "Type", "enum.Enum",
++                                      "Mouse event type.")
++            .value("MOVE", MouseEvent::Type::MOVE)
+             .value("BUTTON_DOWN", MouseEvent::Type::BUTTON_DOWN)
+             .value("DRAG", MouseEvent::Type::DRAG)
+             .value("BUTTON_UP", MouseEvent::Type::BUTTON_UP)
+             .value("WHEEL", MouseEvent::Type::WHEEL)
+-            .export_values();
+-    py::enum_<KeyName> key_name(m_gui, "KeyName",
+-                                "Names of keys. Used by KeyEvent.key");
+-    key_name.value("NONE", KeyName::KEY_NONE)
++            .finalize();
++    py::native_enum<KeyName>(m_gui, "KeyName", "enum.IntEnum",
++                             "Names of keys. Used by KeyEvent.key")
++            .value("NONE", KeyName::KEY_NONE)
+             .value("BACKSPACE", KeyName::KEY_BACKSPACE)
+             .value("TAB", KeyName::KEY_TAB)
+             .value("ENTER", KeyName::KEY_ENTER)
+@@ -149,14 +149,14 @@ void pybind_gui_events_declarations(py::module& m_gui) {
+             .value("F11", KeyName::KEY_F11)
+             .value("F12", KeyName::KEY_F12)
+             .value("UNKNOWN", KeyName::KEY_UNKNOWN)
+-            .export_values();
++            .finalize();
+     py::class_<KeyEvent> key_event(m_gui, "KeyEvent",
+                                    "Object that stores key events");
+-    py::enum_<KeyEvent::Type> key_event_type(key_event, "Type",
+-                                             py::arithmetic());
+-    key_event_type.value("DOWN", KeyEvent::Type::DOWN)
++    py::native_enum<KeyEvent::Type>(key_event, "Type", "enum.Enum",
++                                    "Key event type.")
++            .value("DOWN", KeyEvent::Type::DOWN)
+             .value("UP", KeyEvent::Type::UP)
+-            .export_values();
++            .finalize();
+ }
+ void pybind_gui_events_definitions(py::module& m_gui) {
+     auto mouse_event =
+diff --git a/cpp/pybind/visualization/gui/gui.cpp b/cpp/pybind/visualization/gui/gui.cpp
+index d547e73d289..2d92297062f 100644
+--- a/cpp/pybind/visualization/gui/gui.cpp
++++ b/cpp/pybind/visualization/gui/gui.cpp
+@@ -307,11 +307,12 @@ class PySceneWidget : public SceneWidget {
+ void pybind_gui_declarations(py::module &m) {
+     py::module m_gui = m.def_submodule("gui");
+     pybind_gui_events_declarations(m_gui);
+-    py::enum_<FontStyle> font_style(m_gui, "FontStyle", "Font style");
+-    font_style.value("NORMAL", FontStyle::NORMAL)
++    py::native_enum<FontStyle>(m_gui, "FontStyle", "enum.Enum", "Font style")
++            .value("NORMAL", FontStyle::NORMAL)
+             .value("BOLD", FontStyle::BOLD)
+             .value("ITALIC", FontStyle::ITALIC)
+-            .value("BOLD_ITALIC", FontStyle::BOLD_ITALIC);
++            .value("BOLD_ITALIC", FontStyle::BOLD_ITALIC)
++            .finalize();
+     py::class_<FontDescription> fd(m_gui, "FontDescription",
+                                    "Class to describe a custom font");
+     py::class_<Application> application(m_gui, "Application",
+@@ -340,10 +341,9 @@ void pybind_gui_declarations(py::module &m) {
+     py::class_<Size> size(m_gui, "Size", "Size object");
+     py::class_<Widget, UnownedPointer<Widget>> widget(m_gui, "Widget",
+                                                       "Base widget class");
+-    py::enum_<EventCallbackResult> widget_event_callback_result(
+-            widget, "EventCallbackResult", "Returned by event handlers",
+-            py::arithmetic());
+-    widget_event_callback_result
++    py::native_enum<EventCallbackResult>(widget, "EventCallbackResult",
++                                         "enum.IntEnum",
++                                         "Returned by event handlers")
+             .value("IGNORED", EventCallbackResult::IGNORED,
+                    "Event handler ignored the event, widget will "
+                    "handle event normally")
+@@ -357,7 +357,8 @@ void pybind_gui_declarations(py::module &m) {
+                    "handling stops, widget will not handle the "
+                    "event. This is useful when you are replacing "
+                    "functionality")
+-            .export_values();
++            .export_values()
++            .finalize();
+     py::class_<Widget::Constraints> constraints(
+             widget, "Constraints",
+             "Constraints object for Widget.calc_preferred_size()");
+@@ -401,25 +402,21 @@ void pybind_gui_declarations(py::module &m) {
+             m_gui, "Combobox", "Exclusive selection from a pull-down menu");
+     py::class_<RadioButton, UnownedPointer<RadioButton>, Widget> radiobtn(
+             m_gui, "RadioButton", "Exclusive selection from radio button list");
+-    py::enum_<RadioButton::Type> radiobtn_type(radiobtn, "Type",
+-                                               py::arithmetic());
+-    // Trick to write docs without listing the members in the enum class again.
+-    radiobtn_type.attr("__doc__") = docstring::static_property(
+-            py::cpp_function([](py::handle arg) -> std::string {
+-                return "Enum class for RadioButton types.";
+-            }),
+-            py::none(), py::none(), "");
+-    radiobtn_type.value("VERT", RadioButton::Type::VERT)
++    py::native_enum<RadioButton::Type>(radiobtn, "Type", "enum.Enum",
++                                       "Enum class for RadioButton types.")
++            .value("VERT", RadioButton::Type::VERT)
+             .value("HORIZ", RadioButton::Type::HORIZ)
+-            .export_values();
++            .export_values()
++            .finalize();
+     py::class_<UIImage, UnownedPointer<UIImage>> uiimage(
+             m_gui, "UIImage",
+             "A bitmap suitable for displaying with ImageWidget");
+-    py::enum_<UIImage::Scaling> uiimage_scaling(uiimage, "Scaling",
+-                                                py::arithmetic());
+-    uiimage_scaling.value("NONE", UIImage::Scaling::NONE)
++    py::native_enum<UIImage::Scaling>(uiimage, "Scaling", "enum.Enum",
++                                      "Enum class for UIImage scaling modes.")
++            .value("NONE", UIImage::Scaling::NONE)
+             .value("ANY", UIImage::Scaling::ANY)
+-            .value("ASPECT", UIImage::Scaling::ASPECT);
++            .value("ASPECT", UIImage::Scaling::ASPECT)
++            .finalize();
+     py::class_<PyImageWidget, UnownedPointer<PyImageWidget>, Widget>
+             imagewidget(m_gui, "ImageWidget", "Displays a bitmap");
+     py::class_<Label, UnownedPointer<Label>, Widget> label(m_gui, "Label",
+@@ -430,29 +427,20 @@ void pybind_gui_declarations(py::module &m) {
+             m_gui, "ListView", "Displays a list of text");
+     py::class_<NumberEdit, UnownedPointer<NumberEdit>, Widget> numedit(
+             m_gui, "NumberEdit", "Allows the user to enter a number.");
+-    py::enum_<NumberEdit::Type> numedit_type(numedit, "Type", py::arithmetic());
+-    // Trick to write docs without listing the members in the enum class again.
+-    numedit_type.attr("__doc__") = docstring::static_property(
+-            py::cpp_function([](py::handle arg) -> std::string {
+-                return "Enum class for NumberEdit types.";
+-            }),
+-            py::none(), py::none(), "");
+-    numedit_type.value("INT", NumberEdit::Type::INT)
++    py::native_enum<NumberEdit::Type>(numedit, "Type", "enum.Enum",
++                                      "Enum class for NumberEdit types.")
++            .value("INT", NumberEdit::Type::INT)
+             .value("DOUBLE", NumberEdit::Type::DOUBLE)
+-            .export_values();
++            .export_values()
++            .finalize();
+     py::class_<ProgressBar, UnownedPointer<ProgressBar>, Widget> progress(
+             m_gui, "ProgressBar", "Displays a progress bar");
+     py::class_<PySceneWidget, UnownedPointer<PySceneWidget>, Widget> scene(
+             m_gui, "SceneWidget", "Displays 3D content");
+-    py::enum_<SceneWidget::Controls> scene_ctrl(scene, "Controls",
+-                                                py::arithmetic());
+-    // Trick to write docs without listing the members in the enum class again.
+-    scene_ctrl.attr("__doc__") = docstring::static_property(
+-            py::cpp_function([](py::handle arg) -> std::string {
+-                return "Enum class describing mouse interaction.";
+-            }),
+-            py::none(), py::none(), "");
+-    scene_ctrl.value("ROTATE_CAMERA", SceneWidget::Controls::ROTATE_CAMERA)
++    py::native_enum<SceneWidget::Controls>(
++            scene, "Controls", "enum.Enum",
++            "Enum class describing mouse interaction.")
++            .value("ROTATE_CAMERA", SceneWidget::Controls::ROTATE_CAMERA)
+             .value("ROTATE_CAMERA_SPHERE",
+                    SceneWidget::Controls::ROTATE_CAMERA_SPHERE)
+             .value("FLY", SceneWidget::Controls::FLY)
+@@ -460,19 +448,16 @@ void pybind_gui_declarations(py::module &m) {
+             .value("ROTATE_IBL", SceneWidget::Controls::ROTATE_IBL)
+             .value("ROTATE_MODEL", SceneWidget::Controls::ROTATE_MODEL)
+             .value("PICK_POINTS", SceneWidget::Controls::PICK_POINTS)
+-            .export_values();
++            .export_values()
++            .finalize();
+     py::class_<Slider, UnownedPointer<Slider>, Widget> slider(
+             m_gui, "Slider", "A slider widget for visually selecting numbers");
+-    py::enum_<Slider::Type> slider_type(slider, "Type", py::arithmetic());
+-    // Trick to write docs without listing the members in the enum class again.
+-    slider_type.attr("__doc__") = docstring::static_property(
+-            py::cpp_function([](py::handle arg) -> std::string {
+-                return "Enum class for Slider types.";
+-            }),
+-            py::none(), py::none(), "");
+-    slider_type.value("INT", Slider::Type::INT)
++    py::native_enum<Slider::Type>(slider, "Type", "enum.Enum",
++                                  "Enum class for Slider types.")
++            .value("INT", Slider::Type::INT)
+             .value("DOUBLE", Slider::Type::DOUBLE)
+-            .export_values();
++            .export_values()
++            .finalize();
+     py::class_<StackedWidget, UnownedPointer<StackedWidget>, Widget> stacked(
+             m_gui, "StackedWidget", "Like a TabControl but without the tabs");
+     py::class_<TabControl, UnownedPointer<TabControl>, Widget> tabctrl(
+@@ -515,17 +500,13 @@ void pybind_gui_declarations(py::module &m) {
+                                                               "Dialog");
+     py::class_<FileDialog, UnownedPointer<FileDialog>, Dialog> filedlg(
+             m_gui, "FileDialog", "File picker dialog");
+-    py::enum_<FileDialog::Mode> filedlg_mode(filedlg, "Mode", py::arithmetic());
+-    // Trick to write docs without listing the members in the enum class again.
+-    filedlg_mode.attr("__doc__") = docstring::static_property(
+-            py::cpp_function([](py::handle arg) -> std::string {
+-                return "Enum class for FileDialog modes.";
+-            }),
+-            py::none(), py::none(), "");
+-    filedlg_mode.value("OPEN", FileDialog::Mode::OPEN)
++    py::native_enum<FileDialog::Mode>(filedlg, "Mode", "enum.Enum",
++                                      "Enum class for FileDialog modes.")
++            .value("OPEN", FileDialog::Mode::OPEN)
+             .value("SAVE", FileDialog::Mode::SAVE)
+             .value("OPEN_DIR", FileDialog::Mode::OPEN_DIR)
+-            .export_values();
++            .export_values()
++            .finalize();
+ }
+ void pybind_gui_definitions(py::module &m) {
+     auto m_gui = static_cast<py::module>(m.attr("gui"));
+diff --git a/cpp/pybind/visualization/o3dvisualizer.cpp b/cpp/pybind/visualization/o3dvisualizer.cpp
+index 7da7cd1cbea..c8c88a1f87c 100644
+--- a/cpp/pybind/visualization/o3dvisualizer.cpp
++++ b/cpp/pybind/visualization/o3dvisualizer.cpp
+@@ -28,9 +28,8 @@ void pybind_o3dvisualizer_declarations(py::module& m) {
+     py::class_<O3DVisualizer, UnownedPointer<O3DVisualizer>, gui::Window>
+             o3dvis(m, "O3DVisualizer", "Visualization object used by draw()");
+ 
+-    py::enum_<O3DVisualizer::Shader> dv_shader(o3dvis, "Shader",
+-                                               "Scene-level rendering options");
+-    dv_shader
++    py::native_enum<O3DVisualizer::Shader>(o3dvis, "Shader", "enum.Enum",
++                                           "Scene-level rendering options")
+             .value("STANDARD", O3DVisualizer::Shader::STANDARD,
+                    "Pixel colors from standard lighting model")
+             .value("UNLIT", O3DVisualizer::Shader::UNLIT,
+@@ -39,15 +38,18 @@ void pybind_o3dvisualizer_declarations(py::module& m) {
+                    "Pixel colors correspond to surface normal")
+             .value("DEPTH", O3DVisualizer::Shader::DEPTH,
+                    "Pixel colors correspond to depth buffer value")
+-            .export_values();
++            .export_values()
++            .finalize();
+ 
+-    py::enum_<O3DVisualizer::TickResult> tick_result(
+-            o3dvis, "TickResult", "Return value from animation tick callback");
+-    tick_result
++    py::native_enum<O3DVisualizer::TickResult>(
++            o3dvis, "TickResult", "enum.Enum",
++            "Return value from animation tick callback")
+             .value("NO_CHANGE", O3DVisualizer::TickResult::NO_CHANGE,
+                    "Signals that no change happened and no redraw is required")
+             .value("REDRAW", O3DVisualizer::TickResult::REDRAW,
+-                   "Signals that a redraw is required");
++                   "Signals that a redraw is required")
++            .export_values()
++            .finalize();
+ 
+     py::class_<O3DVisualizer::DrawObject> drawobj(
+             o3dvis, "DrawObject",
+diff --git a/cpp/pybind/visualization/rendering/rendering.cpp b/cpp/pybind/visualization/rendering/rendering.cpp
+index 777b7ce637d..417f8d9d2ad 100644
+--- a/cpp/pybind/visualization/rendering/rendering.cpp
++++ b/cpp/pybind/visualization/rendering/rendering.cpp
+@@ -125,19 +125,21 @@ void pybind_rendering_declarations(py::module &m) {
+                       "image");
+     py::class_<Camera, std::shared_ptr<Camera>> cam(m_rendering, "Camera",
+                                                     "Camera object");
+-    py::enum_<Camera::FovType> fov_type(cam, "FovType", py::arithmetic(),
+-                                        "Enum class for Camera field of view "
+-                                        "types.");
+-    fov_type.value("Vertical", Camera::FovType::Vertical)
++    py::native_enum<Camera::FovType>(
++            cam, "FovType", "enum.Enum",
++            "Enum class for Camera field of view types.")
++            .value("Vertical", Camera::FovType::Vertical)
+             .value("Horizontal", Camera::FovType::Horizontal)
+-            .export_values();
++            .export_values()
++            .finalize();
+ 
+-    py::enum_<Camera::Projection> proj_type(cam, "Projection", py::arithmetic(),
+-                                            "Enum class for Camera projection "
+-                                            "types.");
+-    proj_type.value("Perspective", Camera::Projection::Perspective)
++    py::native_enum<Camera::Projection>(
++            cam, "Projection", "enum.Enum",
++            "Enum class for Camera projection types.")
++            .value("Perspective", Camera::Projection::Perspective)
+             .value("Ortho", Camera::Projection::Ortho)
+-            .export_values();
++            .export_values()
++            .finalize();
+     py::class_<Gradient, std::shared_ptr<Gradient>> gradient(
+             m_rendering, "Gradient",
+             "Manages a gradient for the unlitGradient shader."
+@@ -161,10 +163,11 @@ void pybind_rendering_declarations(py::module &m) {
+             "the texture."
+             "  The points *must* be sorted from the smallest value to the "
+             "largest. The values must be in the range [0, 1].");
+-    py::enum_<Gradient::Mode> gradient_mode(gradient, "Mode", py::arithmetic());
+-    gradient_mode.value("GRADIENT", Gradient::Mode::kGradient)
++    py::native_enum<Gradient::Mode>(gradient, "Mode", "enum.Enum")
++            .value("GRADIENT", Gradient::Mode::kGradient)
+             .value("LUT", Gradient::Mode::kLUT)
+-            .export_values();
++            .export_values()
++            .finalize();
+     py::class_<Gradient::Point> gpt(gradient, "Point");
+     py::class_<MaterialRecord> mat(
+             m_rendering, "MaterialRecord",
+@@ -180,50 +183,56 @@ void pybind_rendering_declarations(py::module &m) {
+     py::class_<ColorGradingParams> color_grading(
+             m_rendering, "ColorGrading",
+             "Parameters to control color grading options");
+-    py::enum_<ColorGradingParams::Quality> cgp_quality(
+-            color_grading, "Quality",
+-            "Quality level of color grading operations");
+-    cgp_quality.value("LOW", ColorGradingParams::Quality::kLow)
++    py::native_enum<ColorGradingParams::Quality>(
++            color_grading, "Quality", "enum.Enum",
++            "Quality level of color grading operations")
++            .value("LOW", ColorGradingParams::Quality::kLow)
+             .value("MEDIUM", ColorGradingParams::Quality::kMedium)
+             .value("HIGH", ColorGradingParams::Quality::kHigh)
+-            .value("ULTRA", ColorGradingParams::Quality::kUltra);
+-    py::enum_<ColorGradingParams::ToneMapping> cgp_tone(
+-            color_grading, "ToneMapping",
+-            "Specifies the tone-mapping algorithm");
+-    cgp_tone.value("LINEAR", ColorGradingParams::ToneMapping::kLinear)
++            .value("ULTRA", ColorGradingParams::Quality::kUltra)
++            .finalize();
++    py::native_enum<ColorGradingParams::ToneMapping>(
++            color_grading, "ToneMapping", "enum.Enum",
++            "Specifies the tone-mapping algorithm")
++            .value("LINEAR", ColorGradingParams::ToneMapping::kLinear)
+             .value("ACES_LEGACY", ColorGradingParams::ToneMapping::kAcesLegacy)
+             .value("ACES", ColorGradingParams::ToneMapping::kAces)
+             .value("FILMIC", ColorGradingParams::ToneMapping::kFilmic)
+             .value("UCHIMURA", ColorGradingParams::ToneMapping::kUchimura)
+             .value("REINHARD", ColorGradingParams::ToneMapping::kReinhard)
+             .value("DISPLAY_RANGE",
+-                   ColorGradingParams::ToneMapping::kDisplayRange);
++                   ColorGradingParams::ToneMapping::kDisplayRange)
++            .finalize();
+     py::class_<View, UnownedPointer<View>> view(m_rendering, "View",
+                                                 "Low-level view class");
+-    py::enum_<View::ShadowType> shadow_type(
+-            view, "ShadowType", "Available shadow mapping algorithm options");
+-    shadow_type.value("PCF", View::ShadowType::kPCF)
+-            .value("VSM", View::ShadowType::kVSM);
++    py::native_enum<View::ShadowType>(
++            view, "ShadowType", "enum.Enum",
++            "Available shadow mapping algorithm options")
++            .value("PCF", View::ShadowType::kPCF)
++            .value("VSM", View::ShadowType::kVSM)
++            .finalize();
+     py::class_<Scene, UnownedPointer<Scene>> scene(m_rendering, "Scene",
+                                                    "Low-level rendering scene");
+-    py::enum_<Scene::GroundPlane> ground_plane(
+-            scene, "GroundPlane", py::arithmetic(),
+-            "Plane on which to show ground plane: XZ, XY, or YZ");
+-    ground_plane.value("XZ", Scene::GroundPlane::XZ)
++    py::native_enum<Scene::GroundPlane>(
++            scene, "GroundPlane", "enum.Enum",
++            "Plane on which to show ground plane: XZ, XY, or YZ")
++            .value("XZ", Scene::GroundPlane::XZ)
+             .value("XY", Scene::GroundPlane::XY)
+             .value("YZ", Scene::GroundPlane::YZ)
+-            .export_values();
++            .export_values()
++            .finalize();
+     py::class_<Open3DScene, UnownedPointer<Open3DScene>> o3dscene(
+             m_rendering, "Open3DScene", "High-level scene for rending");
+-    py::enum_<Open3DScene::LightingProfile> lighting(
+-            o3dscene, "LightingProfile", py::arithmetic(),
+-            "Enum for conveniently setting lighting");
+-    lighting.value("HARD_SHADOWS", Open3DScene::LightingProfile::HARD_SHADOWS)
++    py::native_enum<Open3DScene::LightingProfile>(
++            o3dscene, "LightingProfile", "enum.Enum",
++            "Enum for conveniently setting lighting")
++            .value("HARD_SHADOWS", Open3DScene::LightingProfile::HARD_SHADOWS)
+             .value("DARK_SHADOWS", Open3DScene::LightingProfile::DARK_SHADOWS)
+             .value("MED_SHADOWS", Open3DScene::LightingProfile::MED_SHADOWS)
+             .value("SOFT_SHADOWS", Open3DScene::LightingProfile::SOFT_SHADOWS)
+             .value("NO_SHADOWS", Open3DScene::LightingProfile::NO_SHADOWS)
+-            .export_values();
++            .export_values()
++            .finalize();
+ }
+ void pybind_rendering_definitions(py::module &m) {
+     auto m_rendering = static_cast<py::module>(m.attr("rendering"));
+diff --git a/cpp/pybind/visualization/renderoption.cpp b/cpp/pybind/visualization/renderoption.cpp
+index 5e66621e358..f17fbe2ef19 100644
+--- a/cpp/pybind/visualization/renderoption.cpp
++++ b/cpp/pybind/visualization/renderoption.cpp
+@@ -20,52 +20,37 @@ void pybind_renderoption_declarations(py::module &m) {
+             m, "RenderOption", "Defines rendering options for visualizer.");
+     // This is a nested class, but now it's bind to the module
+     // o3d.visualization.PointColorOption
+-    py::enum_<RenderOption::PointColorOption> enum_point_color_option(
+-            m, "PointColorOption", py::arithmetic(), "PointColorOption");
+-    enum_point_color_option.attr("__doc__") = docstring::static_property(
+-            py::cpp_function([](py::handle arg) -> std::string {
+-                return "Enum class for point color for ``PointCloud``.";
+-            }),
+-            py::none(), py::none(), "");
+-    enum_point_color_option
++    py::native_enum<RenderOption::PointColorOption>(
++            m, "PointColorOption", "enum.Enum",
++            "Enum class for point color for ``PointCloud``.")
+             .value("Default", RenderOption::PointColorOption::Default)
+             .value("Color", RenderOption::PointColorOption::Color)
+             .value("XCoordinate", RenderOption::PointColorOption::XCoordinate)
+             .value("YCoordinate", RenderOption::PointColorOption::YCoordinate)
+             .value("ZCoordinate", RenderOption::PointColorOption::ZCoordinate)
+             .value("Normal", RenderOption::PointColorOption::Normal)
+-            .export_values();
++            .finalize();
+     // This is a nested class, but now it's bind to the module
+     // o3d.visualization.MeshShadeOption
+-    py::enum_<RenderOption::MeshShadeOption> enum_mesh_shade_option(
+-            m, "MeshShadeOption", py::arithmetic(), "MeshShadeOption");
+-    enum_mesh_shade_option.attr("__doc__") = docstring::static_property(
+-            py::cpp_function([](py::handle arg) -> std::string {
+-                return "Enum class for mesh shading for ``TriangleMesh``.";
+-            }),
+-            py::none(), py::none(), "");
+-    enum_mesh_shade_option
++    py::native_enum<RenderOption::MeshShadeOption>(
++            m, "MeshShadeOption", "enum.Enum",
++            "Enum class for mesh shading for ``TriangleMesh``.")
+             .value("Default", RenderOption::MeshShadeOption::FlatShade)
+             .value("Color", RenderOption::MeshShadeOption::SmoothShade)
+-            .export_values();
++            .finalize();
+ 
+     // This is a nested class, but now it's bind to the module
+     // o3d.visualization.MeshColorOption
+-    py::enum_<RenderOption::MeshColorOption> enum_mesh_clor_option(
+-            m, "MeshColorOption", py::arithmetic(), "MeshColorOption");
+-    enum_mesh_clor_option.attr("__doc__") = docstring::static_property(
+-            py::cpp_function([](py::handle arg) -> std::string {
+-                return "Enum class for color for ``TriangleMesh``.";
+-            }),
+-            py::none(), py::none(), "");
+-    enum_mesh_clor_option
++    py::native_enum<RenderOption::MeshColorOption>(
++            m, "MeshColorOption", "enum.Enum",
++            "Enum class for color for ``TriangleMesh``.")
+             .value("Default", RenderOption::MeshColorOption::Default)
+             .value("Color", RenderOption::MeshColorOption::Color)
+             .value("XCoordinate", RenderOption::MeshColorOption::XCoordinate)
+             .value("YCoordinate", RenderOption::MeshColorOption::YCoordinate)
+             .value("ZCoordinate", RenderOption::MeshColorOption::ZCoordinate)
+             .value("Normal", RenderOption::MeshColorOption::Normal)
+-            .export_values();
++            .finalize();
+ }
+ void pybind_renderoption_definitions(py::module &m) {
+     // open3d.visualization.RenderOption

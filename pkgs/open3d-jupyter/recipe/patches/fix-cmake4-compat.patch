@@ -1,0 +1,10 @@
+--- a/3rdparty/find_dependencies.cmake
++++ b/3rdparty/find_dependencies.cmake
+@@ -71,6 +71,7 @@
+ # CMake arguments for configuring ExternalProjects. Use the second _hidden
+ # version by default.
+ set(ExternalProject_CMAKE_ARGS
++    -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+     -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+     -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+     -DCMAKE_CUDA_COMPILER=${CMAKE_CUDA_COMPILER}

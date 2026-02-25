@@ -1,0 +1,18 @@
+[workspace]
+name = "open3d-jupyter"
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+preview = ["pixi-build"]
+
+[dependencies]
+open3d-jupyter = { path = "." }
+
+[package]
+name = "open3d-jupyter"
+version = "0.19.0"
+
+[package.build]
+backend = { name = "pixi-build-rattler-build", version = "*", channels = ["https://prefix.dev/pixi-build-backends", "conda-forge"] }
+
+[package.build.source]
+path = "recipe"

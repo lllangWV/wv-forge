@@ -1,0 +1,152 @@
+# Recipe for Open3D - 3D Data Processing Library with Jupyter Extension
+# Converted from conda-forge meta.yaml to rattler-build recipe.yaml
+# https://github.com/isl-org/Open3D
+
+context:
+  name: open3d-jupyter
+  version: "0.19.0"
+
+package:
+  name: ${{ name }}
+  version: ${{ version }}
+
+source:
+  - url: https://github.com/isl-org/Open3D/archive/v${{ version }}.tar.gz
+    sha256: 5cedb0e093c6baceab801b903eb8e2558bc2b3999ac57762bf78a39d5e15394a
+    patches:
+      - patches/fix-unzip.patch
+      - patches/fix-curl.patch
+      - patches/fix-error.patch
+      - patches/fix-find-imgui.patch
+      - patches/7249.patch
+      - patches/fix-gcc15-cstdint.patch
+      - patches/fix-cuda-arch-3digit.patch
+      - patches/fix-cmake4-compat.patch
+      - patches/fix-missing-memory-include.patch
+      - patches/fix-civetweb-visibility.patch
+      - patches/fix-civetweb-whole-archive.patch
+
+build:
+  number: 0
+  skip:
+    - not linux
+  script: build.sh
+  python:
+    entry_points:
+      - open3d = open3d.tools.cli:main
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+    - ${{ compiler('cxx') }}
+    - cmake
+    - make
+    - ninja
+    - pkg-config
+    - git
+    - nodejs >=14
+    - yarn
+    - if: linux
+      then: libgomp
+    - if: osx
+      then: llvm-openmp
+  host:
+    - python
+    - pip
+    - setuptools
+    - yapf
+    - jupyter_packaging
+    - jupyterlab >=4
+    - ipywidgets >=8.0.4
+    # OpenGL / X11
+    - libgl-devel
+    - libglx-devel
+    - libopengl-devel
+    - xorg-libxdamage
+    - xorg-libxfixes
+    - libxcb
+    # Core C++ deps (system-provided via USE_SYSTEM_*=ON)
+    - assimp
+    - libzlib
+    - eigen
+    - embree
+    - glew
+    - glfw
+    - libcxx
+    # - fmt
+    - libjpeg-turbo
+    - gmock
+    - jsoncpp
+    - zeromq
+    - cppzmq
+    - msgpack-c
+    - msgpack-cxx
+    - minizip
+    - vtk
+    - qt6-main
+    - libpng
+    - pybind11
+    - pybind11-abi
+    - qhull
+    - qhull-static
+    - tinyobjloader
+    - libcblas
+    - liblapacke
+    - blas-devel
+    - nomkl
+    - libboost-headers
+    - nanoflann
+    - liblzf
+    - libcurl
+    - tbb-devel
+  run:
+    - python
+    - numpy
+    - libcblas
+    - liblapacke
+    - scikit-learn
+    - pyyaml
+    - pandas
+    - scipy
+    - tqdm
+    - joblib
+    - addict
+    - pillow
+    - plotly
+    - dash
+    - ipywidgets >=8.0.4
+  run_exports:
+    weak:
+      - ${{ pin_subpackage('open3d-jupyter', upper_bound='x.x.x') }}
+  ignore_run_exports:
+    from_package:
+      - minizip
+      - msgpack-c
+      - msgpack-cxx
+
+tests:
+  - python:
+      imports:
+        - open3d
+      pip_check: false
+  - script:
+      - open3d --help
+
+about:
+  homepage: http://www.open3d.org/
+  summary: Open-source library for 3D data processing with Jupyter extension
+  license: MIT
+  license_file:
+    - LICENSE
+    - 3rdparty/uvatlas/LICENSE_directxheaders
+    - 3rdparty/uvatlas/LICENSE_directxmath
+    - 3rdparty/uvatlas/LICENSE_uvatlas
+    - 3rdparty/possionrecon/LICENSE
+    - 3rdparty/rply/LICENSE
+    - 3rdparty/tinyfiledialogs/LICENSE
+    - 3rdparty/tinygltf/LICENSE
+  repository: https://github.com/isl-org/Open3D
+
+extra:
+  recipe-maintainers:
+    - lllangWV
