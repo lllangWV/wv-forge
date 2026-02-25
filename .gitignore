@@ -9,3 +9,4 @@ pixi.lock
 .agdex/
 
 tmp/
+__pycache__/
