@@ -64,6 +64,8 @@ requirements:
     - astor
     - easydict
     - huggingface_hub
+    # Sparse convolution
+    - spconv
     # 3D / GPU acceleration
     - gsplat
     - kaolin
