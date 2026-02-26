@@ -1,0 +1,96 @@
+# Recipe for learning3d - Deep learning library for 3D point clouds
+# https://github.com/vinits5/learning3d
+# Includes CUDA extensions: pointnet2_cuda, EMD loss, Chamfer Distance
+
+context:
+  version: "0.2.2"
+  commit: "e74bd8c59fad4b0e8104da3b3349193cdb549943"
+  torch_proc_type: ${{ "cuda" if cuda_compiler_version != "None" else "cpu" }}
+
+package:
+  name: learning3d
+  version: ${{ version }}
+
+source:
+  git: https://github.com/vinits5/learning3d.git
+  rev: ${{ commit }}
+
+build:
+  number: 0
+  string: cu${{ cuda_version | version_to_buildstring }}_py${{ python | version_to_buildstring }}_${{ hash }}
+  skip:
+    - not linux
+  variant:
+    use_keys:
+      - cuda_version
+  script: build.sh
+  dynamic_linking:
+    missing_dso_allowlist:
+      - "**/libc10.so"
+      - "**/libc10_cuda.so"
+      - "**/libtorch.so"
+      - "**/libtorch_cpu.so"
+      - "**/libtorch_cuda.so"
+      - "**/libtorch_python.so"
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+    - ${{ compiler('cxx') }}
+  host:
+    - python
+    - pip
+    - setuptools
+    - wheel
+    - ninja
+    - pytorch >=2.0
+    - pytorch * [build=${{ torch_proc_type }}*]
+    - cuda-version
+    - cuda-cudart-dev
+    - cuda-nvcc
+    - libcublas-dev
+    - libcusparse-dev
+    - libcusolver-dev
+  run:
+    - ${{ pin_compatible('python', upper_bound='x.x') }}
+    - pytorch * [build=${{ torch_proc_type }}*]
+    - ${{ pin_compatible('cuda-version', lower_bound='x.x', upper_bound='x') }}
+    - cuda-cudart
+    - numpy
+    - scipy
+    - scikit-learn
+    - h5py
+    - tqdm
+    - transforms3d
+    - tensorboardx
+    - open3d
+  ignore_run_exports:
+    from_package:
+      - cuda-cudart-dev
+      - libcublas-dev
+      - libcusparse-dev
+      - libcusolver-dev
+    by_name:
+      - cuda-version
+
+tests:
+  - python:
+      imports:
+        - learning3d
+        - learning3d.models
+        - learning3d.losses
+        - learning3d.data_utils
+        - learning3d.ops
+        - learning3d.utils
+      pip_check: false
+
+about:
+  homepage: https://github.com/vinits5/learning3d
+  license: MIT
+  license_file: LICENSE
+  summary: "Learning3D: A Modern Library for Deep Learning on 3D Point Clouds Data"
+  repository: https://github.com/vinits5/learning3d
+
+extra:
+  recipe-maintainers:
+    - lllangWV
