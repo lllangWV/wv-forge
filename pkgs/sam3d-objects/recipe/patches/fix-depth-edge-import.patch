@@ -1,0 +1,9 @@
+--- a/sam3d_objects/pipeline/layout_post_optimization_utils.py
++++ b/sam3d_objects/pipeline/layout_post_optimization_utils.py
+@@ -21,7 +21,7 @@
+ from sam3d_objects.model.backbone.tdfy_dit.renderers.gaussian_render import GaussianRenderer
+ from loguru import logger
+-from utils3d.numpy import depth_edge
++from utils3d.numpy import depth_map_edge as depth_edge
+
+ def remove_small_regions(mask, min_area=100):
