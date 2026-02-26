@@ -38,7 +38,7 @@ requirements:
     - pytorch * [build=${{ torch_proc_type }}*]
     - ${{ pin_compatible('cuda-version', lower_bound='x.x', upper_bound='x') }}
     - custom-rasterizer
-    - xatlas
+    - xatlas-python
     - torchvision
     - diffusers
     - transformers >=4.48.0
