@@ -13,9 +13,10 @@ source:
   tag: v${{ version }}
   patches:
     - patches/conda-cuda-paths.patch
+    - patches/add-blackwell-arch.patch
 
 build:
-  number: 0
+  number: 1
   string: cu${{ cuda_version | version_to_buildstring }}_py${{ python | version_to_buildstring }}_${{ hash }}
   skip:
     - not linux
