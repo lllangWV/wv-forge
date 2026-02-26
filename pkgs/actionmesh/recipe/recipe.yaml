@@ -1,0 +1,97 @@
+# Recipe for ActionMesh - Video-to-4D mesh generation
+# https://github.com/facebookresearch/ActionMesh
+
+context:
+  version: "0.0.1"
+  commit: "78ecb45b70577a11cff88f2248834de4eccbf2de"
+  torch_proc_type: ${{ "cuda" if cuda_compiler_version != "None" else "cpu" }}
+
+package:
+  name: actionmesh
+  version: ${{ version }}
+
+source:
+  url: https://github.com/facebookresearch/ActionMesh/archive/${{ commit }}.tar.gz
+  sha256: d0b1d104d258095d41ca0b9405d070bd9b1342e0fa99dddc5648616dcc4cd2b8
+
+build:
+  number: 0
+  string: cu${{ cuda_version | version_to_buildstring }}_py${{ python | version_to_buildstring }}_${{ hash }}
+  skip:
+    - not linux
+  variant:
+    use_keys:
+      - cuda_version
+  script:
+    content: |
+      # The pyproject.toml includes triposg from third_party submodule.
+      # Since we package TripoSG separately, adjust package discovery
+      # to exclude triposg and only include actionmesh + actionbench.
+      cat > pyproject.toml << 'PYPROJECT'
+      [build-system]
+      requires = ["setuptools>=61.0", "wheel"]
+      build-backend = "setuptools.build_meta"
+
+      [project]
+      name = "actionmesh"
+      version = "0.0.1"
+      requires-python = ">=3.10"
+
+      [tool.setuptools.packages.find]
+      include = ["actionmesh*", "actionbench*"]
+      PYPROJECT
+
+      $PYTHON -m pip install . -vv --no-deps --no-build-isolation
+
+requirements:
+  host:
+    - python >=3.10
+    - pip
+    - setuptools >=61.0
+    - wheel
+    - cuda-version
+  run:
+    - ${{ pin_compatible('python', upper_bound='x.x') }}
+    - pytorch * [build=${{ torch_proc_type }}*]
+    - torchvision
+    - ${{ pin_compatible('cuda-version', lower_bound='x.x', upper_bound='x') }}
+    - numpy <2.0
+    - opencv
+    - trimesh
+    - einops
+    - pillow
+    - safetensors
+    - huggingface_hub
+    - transformers <5
+    - diffusers
+    - hydra-core
+    - scipy
+    - scikit-image
+    - imageio
+    - diso
+    - jaxtyping
+    - accelerate
+    - fast-simplification
+    - typeguard
+    - natsort
+    - triposg
+  ignore_run_exports:
+    by_name:
+      - cuda-version
+
+tests:
+  - python:
+      imports:
+        - actionmesh
+      pip_check: false
+
+about:
+  homepage: https://github.com/facebookresearch/ActionMesh
+  license: LicenseRef-FAIR-Noncommercial
+  license_file: LICENSE.txt
+  summary: "ActionMesh: Video-to-4D mesh generation from Meta FAIR"
+  repository: https://github.com/facebookresearch/ActionMesh
+
+extra:
+  recipe-maintainers:
+    - lllangWV

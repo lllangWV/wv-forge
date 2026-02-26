@@ -1,0 +1,73 @@
+# Recipe for map-anything - Universal Feed-Forward Metric 3D Reconstruction
+# https://github.com/facebookresearch/map-anything
+
+context:
+  version: "1.1"
+  torch_proc_type: ${{ "cuda" if cuda_compiler_version != "None" else "cpu" }}
+
+package:
+  name: mapanything
+  version: ${{ version }}
+
+source:
+  url: https://github.com/facebookresearch/map-anything/archive/refs/tags/v${{ version }}.tar.gz
+  sha256: ec861ebd08963cf66346c6dbe5f62276cbefd8d237022bc52e7444ec78c7249b
+
+build:
+  number: 0
+  string: cu${{ cuda_version | version_to_buildstring }}_py${{ python | version_to_buildstring }}_${{ hash }}
+  skip:
+    - not linux
+  variant:
+    use_keys:
+      - cuda_version
+  script:
+    content: |
+      $PYTHON -m pip install . -vv --no-deps --no-build-isolation
+
+requirements:
+  host:
+    - python >=3.10
+    - pip
+    - setuptools >=61.0
+    - wheel
+    - cuda-version
+  run:
+    - ${{ pin_compatible('python', upper_bound='x.x') }}
+    - pytorch * [build=${{ torch_proc_type }}*]
+    - ${{ pin_compatible('cuda-version', lower_bound='x.x', upper_bound='x') }}
+    - huggingface_hub
+    - hydra-core
+    - natsort
+    - opencv
+    - orjson
+    - pillow-heif
+    - plyfile
+    - python-box
+    - requests
+    - rerun-sdk
+    - safetensors
+    - tensorboard
+    - tqdm
+    - trimesh
+    - uniception
+  ignore_run_exports:
+    by_name:
+      - cuda-version
+
+tests:
+  - python:
+      imports:
+        - mapanything
+      pip_check: false
+
+about:
+  homepage: https://github.com/facebookresearch/map-anything
+  license: Apache-2.0
+  license_file: LICENSE
+  summary: "Map-Anything: Universal Feed-Forward Metric 3D Reconstruction"
+  repository: https://github.com/facebookresearch/map-anything
+
+extra:
+  recipe-maintainers:
+    - lllangWV
