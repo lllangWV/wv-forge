@@ -1,0 +1,84 @@
+# Recipe for custom-rasterizer - CUDA rasterizer kernel from Hunyuan3D-2
+# https://github.com/Tencent-Hunyuan/Hunyuan3D-2
+
+context:
+  version: "0.1"
+  commit: "f8db63096c8282cb27354314d896feba5ba6ff8a"
+  torch_proc_type: ${{ "cuda" if cuda_compiler_version != "None" else "cpu" }}
+
+package:
+  name: custom-rasterizer
+  version: ${{ version }}
+
+source:
+  git: https://github.com/Tencent-Hunyuan/Hunyuan3D-2.git
+  rev: ${{ commit }}
+
+build:
+  number: 0
+  string: cu${{ cuda_version | version_to_buildstring }}_py${{ python | version_to_buildstring }}_${{ hash }}
+  skip:
+    - not linux
+  variant:
+    use_keys:
+      - cuda_version
+  script:
+    env:
+      FORCE_CUDA: "1"
+      TORCH_CUDA_ARCH_LIST: "8.9;12.0"
+    content: |
+      export CUDA_HOME=$PREFIX
+      cd hy3dgen/texgen/custom_rasterizer
+      $PYTHON -m pip install . -vv --no-deps --no-build-isolation
+  dynamic_linking:
+    missing_dso_allowlist:
+      - "**/libc10.so"
+      - "**/libc10_cuda.so"
+      - "**/libtorch.so"
+      - "**/libtorch_python.so"
+      - "**/libtorch_cuda.so"
+      - "**/libtorch_cpu.so"
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+    - ${{ compiler('cxx') }}
+    - ${{ compiler('cuda') }}
+  host:
+    - python
+    - pip
+    - setuptools
+    - wheel
+    - pytorch >=2.0
+    - pytorch * [build=${{ torch_proc_type }}*]
+    - cuda-version
+    - cuda-cudart-dev
+    - cuda-nvcc
+    - pybind11
+  run:
+    - ${{ pin_compatible('python', upper_bound='x.x') }}
+    - pytorch * [build=${{ torch_proc_type }}*]
+    - ${{ pin_compatible('cuda-version', lower_bound='x.x', upper_bound='x') }}
+    - cuda-cudart
+  ignore_run_exports:
+    from_package:
+      - cuda-cudart-dev
+    by_name:
+      - cuda-version
+
+tests:
+  - python:
+      imports:
+        - custom_rasterizer
+      pip_check: false
+
+about:
+  homepage: https://github.com/Tencent-Hunyuan/Hunyuan3D-2
+  license: LicenseRef-Tencent-Hunyuan-Community
+  license_file: LICENSE
+  summary: CUDA-accelerated rasterizer kernel for Hunyuan3D-2 texture generation
+  repository: https://github.com/Tencent-Hunyuan/Hunyuan3D-2
+
+extra:
+  recipe-maintainers:
+    - lllangWV

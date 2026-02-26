@@ -1,0 +1,80 @@
+# Recipe for hy3dgen - Hunyuan3D-2 3D generation pipeline
+# https://github.com/Tencent-Hunyuan/Hunyuan3D-2
+
+context:
+  version: "2.0.2"
+  commit: "f8db63096c8282cb27354314d896feba5ba6ff8a"
+  torch_proc_type: ${{ "cuda" if cuda_compiler_version != "None" else "cpu" }}
+
+package:
+  name: hy3dgen
+  version: ${{ version }}
+
+source:
+  git: https://github.com/Tencent-Hunyuan/Hunyuan3D-2.git
+  rev: ${{ commit }}
+
+build:
+  number: 0
+  string: cu${{ cuda_version | version_to_buildstring }}_py${{ python | version_to_buildstring }}_${{ hash }}
+  skip:
+    - not linux
+  variant:
+    use_keys:
+      - cuda_version
+  script:
+    content: |
+      $PYTHON -m pip install . -vv --no-deps --no-build-isolation
+
+requirements:
+  host:
+    - python >=3.10
+    - pip
+    - setuptools
+    - wheel
+    - cuda-version
+  run:
+    - ${{ pin_compatible('python', upper_bound='x.x') }}
+    - pytorch * [build=${{ torch_proc_type }}*]
+    - ${{ pin_compatible('cuda-version', lower_bound='x.x', upper_bound='x') }}
+    - custom-rasterizer
+    - xatlas
+    - torchvision
+    - diffusers
+    - transformers >=4.48.0
+    - accelerate
+    - numpy
+    - tqdm >=4.66.3
+    - einops
+    - omegaconf
+    - trimesh
+    - pymeshlab
+    - pygltflib
+    - opencv
+    - gradio
+    - fastapi
+    - uvicorn
+    - rembg
+    - onnxruntime
+  ignore_run_exports:
+    by_name:
+      - cuda-version
+
+tests:
+  - python:
+      imports:
+        - hy3dgen
+        - hy3dgen.shapegen
+        - hy3dgen.texgen
+      pip_check: false
+
+about:
+  homepage: https://github.com/Tencent-Hunyuan/Hunyuan3D-2
+  license: LicenseRef-Tencent-Hunyuan-Community
+  license_file: LICENSE
+  summary: Hunyuan3D-2 high-resolution 3D asset generation with scalable multi-view diffusion
+  repository: https://github.com/Tencent-Hunyuan/Hunyuan3D-2
+
+extra:
+  recipe-maintainers:
+    - lllangWV
