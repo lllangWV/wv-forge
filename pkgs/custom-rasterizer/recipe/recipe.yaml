@@ -54,15 +54,26 @@ requirements:
     - cuda-version
     - cuda-cudart-dev
     - cuda-nvcc
+    - libcublas-dev
+    - libcusparse-dev
+    - libcusolver-dev
     - pybind11
   run:
     - ${{ pin_compatible('python', upper_bound='x.x') }}
     - pytorch * [build=${{ torch_proc_type }}*]
     - ${{ pin_compatible('cuda-version', lower_bound='x.x', upper_bound='x') }}
     - cuda-cudart
+    - numpy
+    - pillow
+    - pygltflib
+    - scipy
+    - opencv
   ignore_run_exports:
     from_package:
       - cuda-cudart-dev
+      - libcublas-dev
+      - libcusparse-dev
+      - libcusolver-dev
     by_name:
       - cuda-version
 
