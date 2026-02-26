@@ -1,0 +1,53 @@
+# Recipe for sophuspy - Pybind11 bindings for Sophus Lie algebra library
+# https://github.com/craigstar/SophusPy
+
+context:
+  version: "1.2.0"
+
+package:
+  name: sophuspy
+  version: ${{ version }}
+
+source:
+  url: https://pypi.org/packages/source/s/sophuspy/sophuspy-${{ version }}.tar.gz
+  sha256: a88d106589fa3d89777226f1df4f419a7aaafa441fc2070092726aa4573eed9f
+
+build:
+  number: 0
+  string: py${{ python | version_to_buildstring }}_${{ hash }}
+  skip:
+    - not linux
+  script:
+    content: |
+      $PYTHON -m pip install . -vv --no-deps --no-build-isolation
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+    - ${{ compiler('cxx') }}
+  host:
+    - python
+    - pip
+    - setuptools
+    - wheel
+    - pybind11
+  run:
+    - ${{ pin_compatible('python', upper_bound='x.x') }}
+    - numpy
+
+tests:
+  - python:
+      imports:
+        - sophuspy
+      pip_check: true
+
+about:
+  homepage: https://github.com/craigstar/SophusPy
+  license: MIT
+  license_file: LICENSE.txt
+  summary: Pybind11 bindings for Sophus Lie algebra library (SO2, SO3, SE2, SE3)
+  repository: https://github.com/craigstar/SophusPy
+
+extra:
+  recipe-maintainers:
+    - lllangWV
