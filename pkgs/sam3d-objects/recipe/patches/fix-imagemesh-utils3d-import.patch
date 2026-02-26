@@ -1,0 +1,11 @@
+--- a/sam3d_objects/utils/visualization/image_mesh.py
++++ b/sam3d_objects/utils/visualization/image_mesh.py
+@@ -6,7 +6,7 @@
+ from pytorch3d.structures import Meshes
+ from pytorch3d.renderer.mesh.textures import TexturesVertex
+
+-from utils3d.numpy import (
++from sam3d_objects._utils3d_compat import (
+     depth_edge,
+     normals_edge,
+     points_to_normals,

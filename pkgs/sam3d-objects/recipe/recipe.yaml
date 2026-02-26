@@ -12,9 +12,13 @@ package:
 source:
   url: https://github.com/facebookresearch/sam-3d-objects/archive/${{ commit }}.tar.gz
   sha256: 6dda92acee2397369daeb56572ba4db043f7ad62b6eb269de5af1dfd647d7641
+  patches:
+    - patches/add-utils3d-compat.patch
+    - patches/fix-layout-utils3d-import.patch
+    - patches/fix-imagemesh-utils3d-import.patch
 
 build:
-  number: 0
+  number: 4
   noarch: python
   script:
     content: |
