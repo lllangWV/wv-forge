@@ -149,7 +149,7 @@ def _yaw_pitch_r_fov_to_extrinsics_intrinsics(yaws, pitchs, rs, fovs):
             torch.tensor([0, 0, 0]).float().cuda(),
             torch.tensor([0, 1, 0]).float().cuda(),
         )
-        intr = utils3d.torch.intrinsics_from_fov_xy(fov, fov)
+        intr = utils3d.torch.intrinsics_from_fov(fov_x=fov, fov_y=fov)
         extrinsics.append(extr)
         intrinsics.append(intr)
     if not is_list:
@@ -181,7 +181,7 @@ def render_video(
         sample,
         extr,
         intr,
-        {"resolution": resolution, "bg_color": bg_color, "backend": "gsplat"},
+        {"resolution": resolution, "bg_color": bg_color, "backend": os.environ.get("RENDER_BACKEND", "gsplat")},
         **kwargs,
     )
 
