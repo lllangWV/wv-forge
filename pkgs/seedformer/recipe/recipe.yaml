@@ -1,0 +1,129 @@
+# Recipe for SeedFormer - Point Cloud Completion with Upsample Transformer
+# https://github.com/hrzhou2/seedformer
+
+context:
+  version: "1.0.0"
+  commit: "869791c240da040ceb843b5f8e46a35727e2542b"
+  torch_proc_type: ${{ "cuda" if cuda_compiler_version != "None" else "cpu" }}
+
+package:
+  name: seedformer
+  version: ${{ version }}
+
+source:
+  git: https://github.com/hrzhou2/seedformer.git
+  rev: ${{ commit }}
+
+build:
+  number: 0
+  string: cu${{ cuda_version | version_to_buildstring }}_py${{ python | version_to_buildstring }}_${{ hash }}
+  skip:
+    - not linux
+  variant:
+    use_keys:
+      - cuda_version
+  script:
+    env:
+      TORCH_CUDA_ARCH_LIST: "8.9;12.0"
+    content: |
+      export CUDA_HOME=$PREFIX
+
+      # Build and install Chamfer3D CUDA extension
+      cd codes/Chamfer3D
+      $PYTHON setup.py install --single-version-externally-managed --record=record.txt
+      cd ../..
+
+      # Install seedformer as a Python package
+      SEEDFORMER_DIR=$SP_DIR/seedformer
+      mkdir -p $SEEDFORMER_DIR
+
+      # Copy core modules
+      cp codes/model.py $SEEDFORMER_DIR/
+      cp codes/manager.py $SEEDFORMER_DIR/
+      cp -r codes/models $SEEDFORMER_DIR/
+      cp -r codes/utils $SEEDFORMER_DIR/
+      cp -r codes/pointnet_utils $SEEDFORMER_DIR/
+      cp -r codes/Chamfer3D $SEEDFORMER_DIR/
+
+      # Create __init__.py that adds package dir to sys.path
+      # so internal relative imports (models.utils, utils.*, etc.) work
+      printf '%s\n' 'import sys as _sys' 'import os as _os' '_pkg_dir = _os.path.dirname(_os.path.abspath(__file__))' 'if _pkg_dir not in _sys.path:' '    _sys.path.insert(0, _pkg_dir)' > $SEEDFORMER_DIR/__init__.py
+
+      # Clean up models/__init__.py (remove hardcoded sys.path hacks)
+      echo '# SeedFormer models' > $SEEDFORMER_DIR/models/__init__.py
+
+      # Ensure subdirectories have __init__.py
+      touch $SEEDFORMER_DIR/pointnet_utils/__init__.py
+      touch $SEEDFORMER_DIR/Chamfer3D/__init__.py
+
+      # Copy training scripts and configs for convenience
+      mkdir -p $PREFIX/share/seedformer
+      cp codes/train_pcn.py $PREFIX/share/seedformer/
+      cp codes/train_shapenet55.py $PREFIX/share/seedformer/
+      cp -r codes/datasets $PREFIX/share/seedformer/
+  dynamic_linking:
+    missing_dso_allowlist:
+      - "**/libc10.so"
+      - "**/libc10_cuda.so"
+      - "**/libtorch.so"
+      - "**/libtorch_cpu.so"
+      - "**/libtorch_cuda.so"
+      - "**/libtorch_python.so"
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+    - ${{ compiler('cxx') }}
+    - ${{ compiler('cuda') }}
+  host:
+    - python
+    - pip
+    - setuptools
+    - wheel
+    - pytorch
+    - pytorch * [build=${{ torch_proc_type }}*]
+    - cuda-version
+    - cuda-cudart-dev
+    - cuda-nvcc
+    - libcublas-dev
+    - libcusparse-dev
+    - libcusolver-dev
+  run:
+    - ${{ pin_compatible('python', upper_bound='x.x') }}
+    - pytorch * [build=${{ torch_proc_type }}*]
+    - ${{ pin_compatible('cuda-version', lower_bound='x.x', upper_bound='x') }}
+    - cuda-cudart
+    - pointnet2-ops
+    - numpy
+    - scipy
+    - h5py
+    - easydict
+    - tqdm
+    - matplotlib
+    - opencv
+  ignore_run_exports:
+    from_package:
+      - cuda-cudart-dev
+      - libcublas-dev
+      - libcusparse-dev
+      - libcusolver-dev
+    by_name:
+      - cuda-version
+
+tests:
+  - python:
+      imports:
+        - seedformer
+        - seedformer.model
+      pip_check: false
+
+about:
+  homepage: https://github.com/hrzhou2/seedformer
+  license: MIT
+  license_file: LICENSE
+  summary: SeedFormer - Patch Seeds based Point Cloud Completion with Upsample Transformer (ECCV 2022)
+  repository: https://github.com/hrzhou2/seedformer
+
+extra:
+  recipe-maintainers:
+    - lllangWV
