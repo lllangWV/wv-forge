@@ -1,0 +1,152 @@
+diff --git a/svgnet/model/criterion.py b/svgnet/model/criterion.py
+index 799a142..2958a52 100644
+--- a/svgnet/model/criterion.py
++++ b/svgnet/model/criterion.py
+@@ -8,9 +8,16 @@ import torch
+ import torch.nn.functional as F
+ from torch import nn
+ import torch.distributed as dist
+-from detectron2.utils.comm import get_world_size
+ from .heads import ContrastHead
+ 
++
++def get_world_size():
++    if not dist.is_available():
++        return 1
++    if not dist.is_initialized():
++        return 1
++    return dist.get_world_size()
++
+ def is_dist_avail_and_initialized():
+     if not dist.is_available():
+         return False
+@@ -166,7 +173,7 @@ class SetCriterion(nn.Module):
+         loss_ce = F.cross_entropy(src_logits.transpose(1, 2), target_classes, self.empty_weight)
+         losses = {"loss_ce": loss_ce * self.weight_dict["loss_ce"]}
+         return losses
+-    
++
+     def loss_masks(self, outputs, targets, indices, num_masks,cts=None):
+         """Compute the losses related to the masks: the focal loss and the dice loss.
+         targets dicts must contain the key "masks" containing a tensor of dim [nb_target_boxes, h, w]
+@@ -176,13 +183,13 @@ class SetCriterion(nn.Module):
+         src_idx = self._get_src_permutation_idx(indices)
+         tgt_idx = self._get_tgt_permutation_idx(indices)
+         src_masks = outputs["pred_masks"]
+-        
++
+         src_masks = src_masks[src_idx]
+         masks = [t["masks"].transpose(0,1).unsqueeze(0) for t in targets]
+         target_masks = torch.cat(masks,dim=0)
+-        
++
+         target_masks = target_masks[tgt_idx]
+-        
++
+         losses = {
+             "loss_mask": sigmoid_ce_loss_jit(src_masks, target_masks, num_masks)*self.weight_dict["loss_mask"],
+             "loss_dice": dice_loss_jit(src_masks, target_masks, num_masks)*self.weight_dict["loss_dice"],
+@@ -208,7 +215,7 @@ class SetCriterion(nn.Module):
+         loss_map = {
+             'labels': self.loss_labels,
+             'masks': self.loss_masks,
+-            
++
+         }
+         assert loss in loss_map, f"do you really want to compute {loss} loss?"
+         return loss_map[loss](outputs, targets, indices, num_masks, cts)
+@@ -223,7 +230,7 @@ class SetCriterion(nn.Module):
+         stage_list = outputs.pop("stage_list")
+         outputs_without_aux = {k: v for k, v in outputs.items() if k != "aux_outputs" and
+                                k != "dn_out"}
+-        
++
+ 
+         # Retrieve the matching between the outputs of the last layer and the targets
+         indices = self.matcher(outputs_without_aux, targets)
+@@ -235,7 +242,7 @@ class SetCriterion(nn.Module):
+         if is_dist_avail_and_initialized():
+             torch.distributed.all_reduce(num_masks)
+         num_masks = torch.clamp(num_masks / get_world_size(), min=1).item()
+-        
++
+         # Compute all the requested losses
+         losses = {}
+         #if self.training: losses.update(self.head(stage_list))
+@@ -250,7 +257,7 @@ class SetCriterion(nn.Module):
+                     l_dict = self.get_loss(loss, aux_outputs, targets, indices, num_masks)
+                     l_dict = {k + f"_{i}": v for k, v in l_dict.items()}
+                     losses.update(l_dict)
+-                
++
+ 
+         return losses
+ 
+diff --git a/svgnet/util/optim.py b/svgnet/util/optim.py
+index abf710f..1c18c7f 100644
+--- a/svgnet/util/optim.py
++++ b/svgnet/util/optim.py
+@@ -2,7 +2,6 @@ import torch.optim
+ from typing import Any, Dict, List, Set
+ import copy
+ import itertools
+-from detectron2.solver.build import maybe_add_gradient_clipping
+ 
+ 
+ def build_optimizer(model, optim_cfg):
+@@ -53,7 +52,7 @@ def build_new_optimizer(model,args):
+             if isinstance(module, torch.nn.Embedding):
+                 hyperparams["weight_decay"] = weight_decay_embed
+             params.append({"params": [value], **hyperparams})
+-            
++
+     def maybe_add_full_model_gradient_clipping(args,optim):
+         # detectron2 doesn't have full model gradient clipping now
+         clip_norm_val = args.clip_gradients_value
+@@ -68,7 +67,7 @@ def build_new_optimizer(model,args):
+                 torch.nn.utils.clip_grad_norm_(all_params, clip_norm_val)
+                 super().step(closure=closure)
+         return FullModelGradientClippingOptimizer if enable else optim
+-    
++
+     optimizer_type = args.type
+     if optimizer_type == "SGD":
+         optimizer = maybe_add_full_model_gradient_clipping(args,torch.optim.SGD)(
+@@ -81,14 +80,26 @@ def build_new_optimizer(model,args):
+     else:
+         raise NotImplementedError(f"no optimizer type {optimizer_type}")
+ 
+-    from detectron2.config import CfgNode as CN
+-    args.SOLVER = CN()
+-    args.SOLVER.CLIP_GRADIENTS = CN()
+-    args.SOLVER.CLIP_GRADIENTS.ENABLED  = args.clip_gradients_enabled
+-    args.SOLVER.CLIP_GRADIENTS.CLIP_TYPE  = args.clip_gradients_type
+-    args.SOLVER.CLIP_GRADIENTS.CLIP_VALUE  = args.clip_gradients_value
+-    args.SOLVER.CLIP_GRADIENTS.NORM_TYPE  = args.clip_gradients_norm_type
++    if not getattr(args, 'clip_gradients_type', 'full_model') == "full_model":
++        clip_type = getattr(args, 'clip_gradients_type', 'norm')
++        clip_value = getattr(args, 'clip_gradients_value', 0.01)
++        norm_type = getattr(args, 'clip_gradients_norm_type', 2.0)
++        enabled = getattr(args, 'clip_gradients_enabled', False)
+ 
+-    if not args.clip_gradients_type == "full_model":
+-        optimizer = maybe_add_gradient_clipping(args, optimizer)
+-    return optimizer
+\ No newline at end of file
++        if enabled and clip_value > 0.0:
++            if clip_type == "value":
++                class ValueClipOptimizer(optimizer.__class__):
++                    def step(self, closure=None):
++                        all_params = itertools.chain(*[x["params"] for x in self.param_groups])
++                        torch.nn.utils.clip_grad_value_(all_params, clip_value)
++                        super().step(closure=closure)
++                optimizer.__class__ = ValueClipOptimizer
++            elif clip_type == "norm":
++                class NormClipOptimizer(optimizer.__class__):
++                    def step(self, closure=None):
++                        all_params = itertools.chain(*[x["params"] for x in self.param_groups])
++                        torch.nn.utils.clip_grad_norm_(all_params, clip_value, norm_type=norm_type)
++                        super().step(closure=closure)
++                optimizer.__class__ = NormClipOptimizer
++
++    return optimizer
