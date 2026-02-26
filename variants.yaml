@@ -14,13 +14,13 @@ channel_sources:
 
 python:
   - "3.12"
-  - "3.13"
+  # - "3.13"
 
 # Must match length of python — zipped together in conda-forge-pinning.
 # Marks which python version is the minimum supported.
 is_python_min:
   - true
-  - false
+  # - false
 
 c_compiler_version:
 - "14"

@@ -1,0 +1,74 @@
+--- /dev/null
++++ b/sam3d_objects/_utils3d_compat.py
+@@ -0,0 +1,52 @@
++"""Compatibility shim for utils3d function name differences.
++
++sam3d-objects was developed against an internal utils3d fork that uses
++different function names. This module provides wrappers that map the
++internal names to the public utils3d API.
++"""
++import numpy as np
++from utils3d.numpy import (
++    depth_map_edge,
++    normal_map_edge,
++    point_map_to_normal_map,
++    uv_map,
++    build_mesh_from_map,
++)
++
++
++def depth_edge(depth, **kwargs):
++    """Alias for utils3d.numpy.depth_map_edge."""
++    return depth_map_edge(depth, **kwargs)
++
++
++def normals_edge(normals, **kwargs):
++    """Alias for utils3d.numpy.normal_map_edge."""
++    return normal_map_edge(normals, **kwargs)
++
++
++def points_to_normals(pointmap, mask=None):
++    """Wrapper for utils3d.numpy.point_map_to_normal_map.
++
++    Returns (normals, normals_mask) tuple to match internal API.
++    """
++    normals = point_map_to_normal_map(pointmap, mask=mask)
++    # The mask of valid normals: where the normal vector is not NaN/zero
++    if normals is not None:
++        normals_mask = np.isfinite(normals).all(axis=-1)
++        if mask is not None:
++            normals_mask = normals_mask & mask
++    else:
++        normals_mask = np.zeros(pointmap.shape[:2], dtype=bool)
++    return normals, normals_mask
++
++
++def image_uv(width, height):
++    """Wrapper for utils3d.numpy.uv_map with (width, height) kwargs."""
++    return uv_map(height, width)
++
++
++def image_mesh(*maps, mask=None, tri=False):
++    """Alias for utils3d.numpy.build_mesh_from_map."""
++    return build_mesh_from_map(*maps, mask=mask, tri=tri)
+--- a/sam3d_objects/pipeline/layout_post_optimization_utils.py
++++ b/sam3d_objects/pipeline/layout_post_optimization_utils.py
+@@ -22,7 +22,7 @@
+ import copy
+ from sam3d_objects.model.backbone.tdfy_dit.renderers.gaussian_render import GaussianRenderer
+ from loguru import logger
+-from utils3d.numpy import depth_edge
++from sam3d_objects._utils3d_compat import depth_edge
+
+ def remove_small_regions(mask, min_area=100):
+--- a/sam3d_objects/utils/visualization/image_mesh.py
++++ b/sam3d_objects/utils/visualization/image_mesh.py
+@@ -6,7 +6,7 @@
+ from pytorch3d.structures import Meshes
+ from pytorch3d.renderer.mesh.textures import TexturesVertex
+
+-from utils3d.numpy import (
++from sam3d_objects._utils3d_compat import (
+     depth_edge,
+     normals_edge,
+     points_to_normals,
