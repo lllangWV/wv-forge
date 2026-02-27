@@ -1,0 +1,27 @@
+# Example project using isaacsim.
+#
+# Before running, build all packages into ../output/ (see root README),
+# then update the local-channel path below to match your checkout location:
+#   file://<absolute-path-to-wv-forge>/output
+
+[workspace]
+name = "isaacsim-example"
+version = "0.1.0"
+description = "Example project using Isaac Sim"
+# The first channel points to locally-built packages in ../output/.
+# Replace the absolute path if your checkout is in a different location.
+channels = [
+    "file:///home/lllang/Documents/lllangWV-Projects/wv-forge/output",
+    "conda-forge",
+    "nvidia",
+]
+platforms = ["linux-64"]
+
+[system-requirements]
+cuda = "12"
+
+[dependencies]
+isaacsim = "*"
+
+[tasks]
+test = "isaac-sim --help"
