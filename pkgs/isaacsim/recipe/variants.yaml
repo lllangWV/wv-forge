@@ -1,0 +1,6 @@
+# Isaac Sim requires GCC 11 — the Kit SDK headers contain implicit pointer
+# conversions that are errors in GCC 14 but accepted by GCC 11.
+c_compiler_version:
+  - "11"
+cxx_compiler_version:
+  - "11"
