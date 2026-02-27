@@ -245,7 +245,7 @@ def build_docker_command(
     sccache_dir = Path.home() / ".cache" / "sccache"
     rattler_cache_dir = Path.home() / ".cache" / "rattler"
 
-    cmd = ["docker", "run", "--rm"]
+    cmd = ["docker", "run", "--rm", "--network", "host"]
 
     # Add -it only when stdin is a TTY
     if sys.stdin.isatty():
