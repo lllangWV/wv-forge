@@ -177,11 +177,21 @@ for pkg_spec in "${PACKAGES[@]}"; do
         variant)
             # Variant builds get channels from channel_sources in the -m files.
             # The channel_override file overrides variants.yaml's static value.
+            VARIANT_ARGS=(
+                -m "$CONDA_FORGE_PINNING"
+                -m "$VARIANT_CONFIG"
+                -m "$CHANNEL_OVERRIDE"
+            )
+            # If the recipe has its own variants.yaml, pass it last so it
+            # overrides conda-forge-pinning (e.g. to pin a specific compiler).
+            RECIPE_VARIANTS="$recipe_path/variants.yaml"
+            if [ -f "$RECIPE_VARIANTS" ]; then
+                log_info "  Using recipe-level variants: $RECIPE_VARIANTS"
+                VARIANT_ARGS+=(-m "$RECIPE_VARIANTS")
+            fi
             rattler-build build \
                 "${COMMON_ARGS[@]}" \
-                -m "$CONDA_FORGE_PINNING" \
-                -m "$VARIANT_CONFIG" \
-                -m "$CHANNEL_OVERRIDE" \
+                "${VARIANT_ARGS[@]}" \
                 || BUILD_OK=false
             ;;
         standard)

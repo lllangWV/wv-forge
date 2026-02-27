@@ -1,0 +1,93 @@
+# Recipe for pointnet2-ops - PointNet2 CUDA operations library
+# https://github.com/hrzhou2/seedformer (codes/pointnet2_ops_lib)
+
+context:
+  version: "3.0.0"
+  commit: "869791c240da040ceb843b5f8e46a35727e2542b"
+  torch_proc_type: ${{ "cuda" if cuda_compiler_version != "None" else "cpu" }}
+
+package:
+  name: pointnet2-ops
+  version: ${{ version }}
+
+source:
+  git: https://github.com/hrzhou2/seedformer.git
+  rev: ${{ commit }}
+
+build:
+  number: 0
+  string: cu${{ cuda_version | version_to_buildstring }}_py${{ python | version_to_buildstring }}_${{ hash }}
+  skip:
+    - not linux
+  variant:
+    use_keys:
+      - cuda_version
+  script:
+    env:
+      TORCH_CUDA_ARCH_LIST: "8.9;12.0"
+    content: |
+      export CUDA_HOME=$PREFIX
+
+      cd codes/pointnet2_ops_lib
+
+      # Remove hardcoded TORCH_CUDA_ARCH_LIST so our env var is used
+      sed -i '/os.environ\["TORCH_CUDA_ARCH_LIST"\]/d' setup.py
+
+      $PYTHON -m pip install . -vv --no-deps --no-build-isolation
+  dynamic_linking:
+    missing_dso_allowlist:
+      - "**/libc10.so"
+      - "**/libc10_cuda.so"
+      - "**/libtorch.so"
+      - "**/libtorch_cpu.so"
+      - "**/libtorch_cuda.so"
+      - "**/libtorch_python.so"
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+    - ${{ compiler('cxx') }}
+    - ${{ compiler('cuda') }}
+  host:
+    - python
+    - pip
+    - setuptools
+    - wheel
+    - pytorch
+    - pytorch * [build=${{ torch_proc_type }}*]
+    - cuda-version
+    - cuda-cudart-dev
+    - cuda-nvcc
+    - libcublas-dev
+    - libcusparse-dev
+    - libcusolver-dev
+  run:
+    - ${{ pin_compatible('python', upper_bound='x.x') }}
+    - pytorch * [build=${{ torch_proc_type }}*]
+    - ${{ pin_compatible('cuda-version', lower_bound='x.x', upper_bound='x') }}
+    - cuda-cudart
+  ignore_run_exports:
+    from_package:
+      - cuda-cudart-dev
+      - libcublas-dev
+      - libcusparse-dev
+      - libcusolver-dev
+    by_name:
+      - cuda-version
+
+tests:
+  - python:
+      imports:
+        - pointnet2_ops
+      pip_check: false
+
+about:
+  homepage: https://github.com/hrzhou2/seedformer
+  license: MIT
+  license_file: LICENSE
+  summary: PointNet2 CUDA operations (ball query, grouping, interpolation, sampling)
+  repository: https://github.com/hrzhou2/seedformer
+
+extra:
+  recipe-maintainers:
+    - lllangWV

@@ -1,0 +1,120 @@
+# Recipe for Isaac Sim - GPU-accelerated robotics simulation platform
+# https://github.com/isaac-sim/IsaacSim
+#
+# NOTE: This recipe requires internet access during build for NVIDIA's packman
+# dependency manager to download the Omniverse Kit SDK, PhysX, and other
+# proprietary components. It is NOT suitable for fully-offline conda builds.
+#
+# The build uses NVIDIA's custom premake5/repo build system. The resulting
+# package is self-contained with its own bundled Python 3.11 and Kit runtime.
+# The conda Python is NOT used at runtime — Isaac Sim ships its own.
+#
+# LICENSING: The source code is Apache-2.0 but building and using Isaac Sim
+# requires acceptance of NVIDIA's additional software license terms. See:
+# https://www.nvidia.com/en-us/agreements/enterprise-software/isaac-sim-additional-software-and-materials-license/
+
+context:
+  version: "5.1.0"
+
+package:
+  name: isaacsim
+  version: ${{ version }}
+
+source:
+  git: https://github.com/isaac-sim/IsaacSim.git
+  tag: v${{ version }}
+  # LFS files (meshes, textures, test assets) are not needed for the build.
+  # Omitting lfs: true avoids requiring git-lfs in the Docker build image.
+
+build:
+  number: 0
+  string: cu${{ cuda_version | version_to_buildstring }}_${{ hash }}
+  skip:
+    - not linux
+  variant:
+    use_keys:
+      - cuda_version
+  script: build.sh
+  # The package bundles its own CUDA runtime, Kit SDK libraries, and Python 3.11.
+  # Suppress rpaths and DSO checks for these internal, self-contained binaries.
+  prefix_detection:
+    ignore:
+      - "share/isaacsim/**"
+  dynamic_linking:
+    missing_dso_allowlist:
+      - "**/*.so*"
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+    - ${{ stdlib('c') }}
+    - ${{ compiler('cxx') }}
+    - ${{ compiler('cuda') }}
+    - git
+    - cmake
+    - make
+    - curl
+    - patchelf
+  host:
+    - cuda-version
+    - cuda-cudart-dev
+    - cuda-nvcc
+    # The Kit SDK binary (downloaded by packman at build time) requires
+    # GLIBCXX_3.4.30+, which is only in libstdc++ from GCC 12+. Since we
+    # compile with GCC 11, we need a newer libstdc++ runtime in $PREFIX/lib.
+    - libstdcxx >=12
+  run:
+    - ${{ pin_compatible('cuda-version', lower_bound='x.x', upper_bound='x') }}
+    - cuda-cudart
+    # System libraries expected by Kit SDK and extensions at runtime
+    - libgl-devel
+    - libglx-devel
+    - libopengl-devel
+    - libxcb
+    - xorg-libx11
+    - xorg-libxext
+    - xorg-libxrandr
+    - xorg-libxi
+    - xorg-libxcursor
+    - xorg-libxinerama
+    - alsa-lib
+    - vulkan-headers
+  ignore_run_exports:
+    from_package:
+      - cuda-cudart-dev
+    by_name:
+      - cuda-version
+
+tests:
+  - script:
+      - test -d $PREFIX/share/isaacsim
+      - test -f $PREFIX/bin/isaac-sim
+      - test -d $PREFIX/share/isaacsim/kit
+      - test -d $PREFIX/share/isaacsim/exts
+      - test -d $PREFIX/share/isaacsim/apps
+      - test -x $PREFIX/bin/isaac-sim
+      - test -x $PREFIX/bin/isaac-sim-python
+      - bash -n $PREFIX/bin/isaac-sim
+      - bash -n $PREFIX/bin/isaac-sim-python
+
+about:
+  homepage: https://docs.isaacsim.omniverse.nvidia.com/latest/index.html
+  license: Apache-2.0
+  license_file: LICENSE
+  summary: GPU-accelerated robotics simulation platform built on NVIDIA Omniverse
+  description: |
+    NVIDIA Isaac Sim is a simulation platform built on NVIDIA Omniverse,
+    designed to develop, test, train, and deploy AI-powered robots in
+    realistic virtual environments. It supports importing robotic systems
+    from common formats such as URDF, MJCF, and CAD. The simulator leverages
+    high-fidelity, GPU-accelerated physics engines to simulate accurate
+    dynamics and support multi-sensor RTX rendering at scale.
+
+    Note: Building and using Isaac Sim requires acceptance of NVIDIA's
+    additional software license terms. See:
+    https://www.nvidia.com/en-us/agreements/enterprise-software/isaac-sim-additional-software-and-materials-license/
+  repository: https://github.com/isaac-sim/IsaacSim
+
+extra:
+  recipe-maintainers:
+    - lllangWV

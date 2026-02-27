@@ -1,0 +1,92 @@
+# Recipe for uniception - Universal Perception models
+# https://github.com/castacks/UniCeption
+# Includes the optional curope CUDA extension for CroCo RoPE kernels
+
+context:
+  version: "0.1.6"
+  torch_proc_type: ${{ "cuda" if cuda_compiler_version != "None" else "cpu" }}
+
+package:
+  name: uniception
+  version: ${{ version }}
+
+source:
+  url: https://pypi.org/packages/source/u/uniception/uniception-${{ version }}.tar.gz
+  sha256: ef92120fe1949d7af57b9bf01eed2051a143801b346b0fb19580a6be4191d11f
+
+build:
+  number: 0
+  string: cu${{ cuda_version | version_to_buildstring }}_py${{ python | version_to_buildstring }}_${{ hash }}
+  skip:
+    - not linux
+  variant:
+    use_keys:
+      - cuda_version
+  script:
+    env:
+      TORCH_CUDA_ARCH_LIST: "8.9;12.0"
+    content: |
+      export CUDA_HOME=$PREFIX
+
+      # Install the main package
+      $PYTHON -m pip install . -vv --no-deps --no-build-isolation
+
+      # Build the curope CUDA extension in-place inside site-packages
+      cd $SP_DIR/uniception/models/libs/croco/curope
+      $PYTHON setup.py build_ext --inplace
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+    - ${{ compiler('cxx') }}
+    - ${{ compiler('cuda') }}
+  host:
+    - python
+    - pip
+    - setuptools >=42
+    - wheel
+    - pytorch
+    - pytorch * [build=${{ torch_proc_type }}*]
+    - cuda-version
+    - cuda-cudart-dev
+    - cuda-nvcc
+  run:
+    - ${{ pin_compatible('python', upper_bound='x.x') }}
+    - pytorch * [build=${{ torch_proc_type }}*]
+    - torchvision
+    - torchaudio
+    - ${{ pin_compatible('cuda-version', lower_bound='x.x', upper_bound='x') }}
+    - cuda-cudart
+    - numpy
+    - jaxtyping
+    - matplotlib
+    - pillow
+    - scikit-learn
+    - einops
+    - rerun-sdk
+    - minio
+    - torchmetrics
+    - termcolor
+    - timm
+  ignore_run_exports:
+    from_package:
+      - cuda-cudart-dev
+    by_name:
+      - cuda-version
+
+tests:
+  - python:
+      imports:
+        - uniception
+      pip_check: false
+
+about:
+  homepage: https://github.com/castacks/UniCeption
+  license: BSD-3-Clause
+  license_file: LICENSE
+  summary: Universal Perception models with optional CroCo RoPE CUDA kernels
+  repository: https://github.com/castacks/UniCeption
+
+extra:
+  recipe-maintainers:
+    - lllangWV

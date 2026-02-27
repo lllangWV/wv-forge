@@ -1,0 +1,74 @@
+# Recipe for diso - Differentiable Isosurface Extraction (Marching Cubes)
+# https://github.com/SarahWeiii/diso
+
+context:
+  version: "0.1.4"
+  torch_proc_type: ${{ "cuda" if cuda_compiler_version != "None" else "cpu" }}
+
+package:
+  name: diso
+  version: ${{ version }}
+
+source:
+  url: https://pypi.org/packages/source/d/diso/diso-${{ version }}.tar.gz
+  sha256: 2ada1c21b84f72fdcec6abc3c4e09200824a7cc9d5de9623a28052e8b1f22c95
+
+build:
+  number: 0
+  string: cu${{ cuda_version | version_to_buildstring }}_py${{ python | version_to_buildstring }}_${{ hash }}
+  skip:
+    - not linux
+  variant:
+    use_keys:
+      - cuda_version
+  script:
+    env:
+      FORCE_CUDA: "1"
+      TORCH_CUDA_ARCH_LIST: "8.9;12.0"
+    content: |
+      export CUDA_HOME=$PREFIX
+      $PYTHON -m pip install . -vv --no-deps --no-build-isolation
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+    - ${{ compiler('cxx') }}
+    - ${{ compiler('cuda') }}
+  host:
+    - python
+    - pip
+    - setuptools
+    - wheel
+    - pytorch
+    - pytorch * [build=${{ torch_proc_type }}*]
+    - cuda-version
+    - cuda-cudart-dev
+    - cuda-nvcc
+  run:
+    - ${{ pin_compatible('python', upper_bound='x.x') }}
+    - pytorch * [build=${{ torch_proc_type }}*]
+    - ${{ pin_compatible('cuda-version', lower_bound='x.x', upper_bound='x') }}
+    - cuda-cudart
+    - trimesh
+  ignore_run_exports:
+    from_package:
+      - cuda-cudart-dev
+    by_name:
+      - cuda-version
+
+tests:
+  - python:
+      imports:
+        - diso
+      pip_check: false
+
+about:
+  homepage: https://github.com/SarahWeiii/diso
+  license: CC-BY-NC-4.0
+  license_file: LICENSE
+  summary: Differentiable Isosurface Extraction with DiffMC and DiffDMC algorithms
+  repository: https://github.com/SarahWeiii/diso
+
+extra:
+  recipe-maintainers:
+    - lllangWV

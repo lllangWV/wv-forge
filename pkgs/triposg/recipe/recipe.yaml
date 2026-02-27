@@ -1,0 +1,88 @@
+# Recipe for TripoSG - Image-to-3D generation foundation model
+# https://github.com/VAST-AI-Research/TripoSG
+
+context:
+  version: "0.1.0"
+  commit: "fc5c40990181e2a756c4e0b1c2f4d6b5202faf8c"
+  torch_proc_type: ${{ "cuda" if cuda_compiler_version != "None" else "cpu" }}
+
+package:
+  name: triposg
+  version: ${{ version }}
+
+source:
+  url: https://github.com/VAST-AI-Research/TripoSG/archive/${{ commit }}.tar.gz
+  sha256: 3d06f11eb795bcabea7863e670e9cea02f96bfc6ec3e6db20e015e5710653682
+
+build:
+  number: 0
+  string: cu${{ cuda_version | version_to_buildstring }}_py${{ python | version_to_buildstring }}_${{ hash }}
+  skip:
+    - not linux
+  variant:
+    use_keys:
+      - cuda_version
+  script:
+    content: |
+      # TripoSG has no pyproject.toml, create one for pip install
+      cat > pyproject.toml << 'PYPROJECT'
+      [build-system]
+      requires = ["setuptools>=61.0", "wheel"]
+      build-backend = "setuptools.build_meta"
+
+      [project]
+      name = "triposg"
+      version = "0.1.0"
+      requires-python = ">=3.10"
+
+      [tool.setuptools.packages.find]
+      include = ["triposg*"]
+      PYPROJECT
+
+      $PYTHON -m pip install . -vv --no-deps --no-build-isolation
+
+requirements:
+  host:
+    - python
+    - pip
+    - setuptools >=61.0
+    - wheel
+    - cuda-version
+  run:
+    - ${{ pin_compatible('python', upper_bound='x.x') }}
+    - pytorch * [build=${{ torch_proc_type }}*]
+    - ${{ pin_compatible('cuda-version', lower_bound='x.x', upper_bound='x') }}
+    - diffusers
+    - transformers
+    - einops
+    - huggingface_hub
+    - opencv
+    - trimesh
+    - omegaconf
+    - scikit-image
+    - numpy
+    - peft
+    - jaxtyping
+    - typeguard
+    - diso
+    - pymeshlab
+  ignore_run_exports:
+    by_name:
+      - cuda-version
+
+tests:
+  - python:
+      imports:
+        - triposg
+      pip_check: false
+
+about:
+  homepage: https://github.com/VAST-AI-Research/TripoSG
+  license: MIT
+  license_file: LICENSE
+  summary: Image-to-3D generation foundation model with 1.5B parameter rectified flow transformer
+  repository: https://github.com/VAST-AI-Research/TripoSG
+
+extra:
+  recipe-maintainers:
+    - lllangWV

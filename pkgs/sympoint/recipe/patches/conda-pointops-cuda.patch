@@ -1,0 +1,30 @@
+diff --git a/modules/pointops/setup.py b/modules/pointops/setup.py
+index 0f5afbd..b112633 100644
+--- a/modules/pointops/setup.py
++++ b/modules/pointops/setup.py
+@@ -1,10 +1,22 @@
+-#python3 setup.py install
+ from setuptools import setup
+ from torch.utils.cpp_extension import BuildExtension, CUDAExtension
+ import os
+-from distutils.sysconfig import get_config_vars
++import sysconfig
+ 
+-(opt,) = get_config_vars('OPT')
++# Conda build compatibility: ensure CUDA_HOME is set from conda environment
++def _setup_conda_cuda():
++    conda_prefix = os.environ.get("CONDA_PREFIX", os.environ.get("PREFIX", ""))
++    if conda_prefix:
++        if "CUDA_HOME" not in os.environ:
++            os.environ["CUDA_HOME"] = conda_prefix
++        # Also ensure nvcc can find the CUDA headers
++        cuda_include = os.path.join(conda_prefix, "include")
++        if os.path.exists(cuda_include):
++            os.environ.setdefault("CPATH", cuda_include)
++
++_setup_conda_cuda()
++
++opt = sysconfig.get_config_var("OPT") or ""
+ os.environ['OPT'] = " ".join(
+     flag for flag in opt.split() if flag != '-Wstrict-prototypes'
+ )

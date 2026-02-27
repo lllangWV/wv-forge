@@ -1,0 +1,126 @@
+# Recipe for SymPoint - Panoptic Symbol Spotting via Point-based Representation
+# https://github.com/nicehuster/SymPoint
+
+context:
+  version: "1.0.0"
+  commit: "e3205a6982a6eb0f99fde43d9e9b112da22a6af9"
+  torch_proc_type: ${{ "cuda" if cuda_compiler_version != "None" else "cpu" }}
+
+package:
+  name: sympoint
+  version: ${{ version }}
+
+source:
+  url: https://github.com/nicehuster/SymPoint/archive/${{ commit }}.tar.gz
+  sha256: 6195d7494503d6bea21ce3e8a3a73a7a1f1fa7f7400c1daba14e4f308bb67a00
+  patches:
+    - patches/conda-pointops-cuda.patch
+    - patches/remove-detectron2.patch
+
+build:
+  number: 0
+  string: cu${{ cuda_version | version_to_buildstring }}_py${{ python | version_to_buildstring }}_${{ hash }}
+  skip:
+    - not linux
+  variant:
+    use_keys:
+      - cuda_version
+  script:
+    env:
+      TORCH_CUDA_ARCH_LIST: "8.9;12.0"
+    content: |
+      export CUDA_HOME=$PREFIX
+
+      # Build and install pointops CUDA extension
+      cd modules/pointops
+      $PYTHON setup.py build_ext --inplace
+      $PYTHON setup.py install --single-version-externally-managed --record=record.txt
+      cd ../..
+
+      # Install sympoint as a Python package via manual copy
+      SYMPOINT_DIR=$SP_DIR/sympoint
+      mkdir -p $SYMPOINT_DIR
+
+      # Copy core modules
+      cp -r modules $SYMPOINT_DIR/
+      cp -r svgnet $SYMPOINT_DIR/
+      cp -r configs $SYMPOINT_DIR/
+
+      # Create __init__.py that adds package dir to sys.path
+      # so internal imports (from modules import ..., from svgnet import ...) work
+      printf '%s\n' \
+        'import sys as _sys' \
+        'import os as _os' \
+        '_pkg_dir = _os.path.dirname(_os.path.abspath(__file__))' \
+        'if _pkg_dir not in _sys.path:' \
+        '    _sys.path.insert(0, _pkg_dir)' \
+        > $SYMPOINT_DIR/__init__.py
+
+      # Copy training/testing scripts and configs for convenience
+      mkdir -p $PREFIX/share/sympoint
+      cp -r tools $PREFIX/share/sympoint/
+      cp -r configs $PREFIX/share/sympoint/
+      cp parse_svg.py $PREFIX/share/sympoint/ || true
+      cp download_data.py $PREFIX/share/sympoint/ || true
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+    - ${{ compiler('cxx') }}
+    - ${{ compiler('cuda') }}
+    - cmake
+    - ninja
+  host:
+    - python
+    - pip
+    - setuptools >=41.0
+    - wheel
+    - pytorch
+    - pytorch * [build=${{ torch_proc_type }}*]
+    - numpy
+    - cuda-version
+    - cuda-cudart-dev
+    - cuda-nvcc
+    - libcusparse-dev
+    - libcublas-dev
+    - libcusolver-dev
+  run:
+    - ${{ pin_compatible('python', upper_bound='x.x') }}
+    - pytorch * [build=${{ torch_proc_type }}*]
+    - torchvision
+    - ${{ pin_compatible('cuda-version', lower_bound='x.x', upper_bound='x') }}
+    - cuda-cudart
+    - numpy
+    - scipy
+    - pyyaml
+    - munch
+    - tensorboard
+    - tensorboardx
+    - svgpathtools
+  ignore_run_exports:
+    from_package:
+      - cuda-cudart-dev
+      - libcusparse-dev
+      - libcublas-dev
+      - libcusolver-dev
+    by_name:
+      - cuda-version
+
+tests:
+  - python:
+      imports:
+        - sympoint
+        - sympoint.svgnet
+        - sympoint.modules
+      pip_check: false
+
+about:
+  homepage: https://github.com/nicehuster/SymPoint
+  license: LicenseRef-IDEA-NonCommercial
+  license_file: LICENSE.txt
+  summary: "SymPoint: Symbol as Points - Panoptic Symbol Spotting via Point-based Representation (ICLR 2024)"
+  repository: https://github.com/nicehuster/SymPoint
+
+extra:
+  recipe-maintainers:
+    - lllangWV

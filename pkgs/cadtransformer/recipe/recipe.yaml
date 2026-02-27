@@ -1,0 +1,90 @@
+# Recipe for CADTransformer - Panoptic Symbol Spotting Transformer for CAD Drawings
+# https://github.com/VITA-Group/CADTransformer
+
+context:
+  version: "1.0.0"
+  commit: "4cf93756642244e4cea35d99912b2d09b20f7387"
+
+package:
+  name: cadtransformer
+  version: ${{ version }}
+
+source:
+  url: https://github.com/VITA-Group/CADTransformer/archive/${{ commit }}.tar.gz
+  sha256: 369c176965a940ab78aa1bb75a3c78a50851144258cb4462bd7e304d1752f8a3
+
+build:
+  number: 0
+  noarch: python
+  script:
+    content: |
+      # Install cadtransformer as a Python package via manual copy
+      CADTRANSFORMER_DIR=$SP_DIR/cadtransformer
+      mkdir -p $CADTRANSFORMER_DIR
+
+      # Copy core modules
+      cp -r config $CADTRANSFORMER_DIR/
+      cp -r models $CADTRANSFORMER_DIR/
+      cp -r utils $CADTRANSFORMER_DIR/
+      cp dataset.py $CADTRANSFORMER_DIR/
+      cp eval.py $CADTRANSFORMER_DIR/
+
+      # Create __init__.py that adds package dir to sys.path
+      # so internal imports (from config import ..., from utils import ...) work
+      printf '%s\n' \
+        'import sys as _sys' \
+        'import os as _os' \
+        '_pkg_dir = _os.path.dirname(_os.path.abspath(__file__))' \
+        'if _pkg_dir not in _sys.path:' \
+        '    _sys.path.insert(0, _pkg_dir)' \
+        > $CADTRANSFORMER_DIR/__init__.py
+
+      # Ensure models/ has __init__.py
+      touch $CADTRANSFORMER_DIR/models/__init__.py
+
+      # Copy training scripts, configs, and preprocessing tools
+      mkdir -p $PREFIX/share/cadtransformer
+      cp train_cad_ddp.py $PREFIX/share/cadtransformer/
+      cp -r scripts $PREFIX/share/cadtransformer/
+      cp -r preprocess $PREFIX/share/cadtransformer/
+
+requirements:
+  host:
+    - python
+    - pip
+    - setuptools
+  run:
+    - python
+    - pytorch
+    - torchvision
+    - timm
+    - yacs
+    - numpy
+    - pandas
+    - scikit-learn
+    - pillow
+    - opencv
+    - matplotlib
+    - scipy
+    - tqdm
+    - gdown
+    - svgpathtools
+    - beautifulsoup4
+
+tests:
+  - python:
+      imports:
+        - cadtransformer
+        - cadtransformer.config
+      pip_check: false
+
+about:
+  homepage: https://github.com/VITA-Group/CADTransformer
+  license: MIT
+  license_file: LICENSE
+  summary: "CADTransformer: Panoptic Symbol Spotting Transformer for CAD Drawings (CVPR 2022 Oral)"
+  repository: https://github.com/VITA-Group/CADTransformer
+
+extra:
+  recipe-maintainers:
+    - lllangWV
