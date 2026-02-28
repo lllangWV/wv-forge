@@ -22,6 +22,7 @@ cuda = "12"
 
 [dependencies]
 isaacsim = "*"
+libxml2 = "<2.13"
 
 [tasks]
 test = "isaac-sim --help"

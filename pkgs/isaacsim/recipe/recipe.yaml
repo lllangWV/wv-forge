@@ -63,6 +63,7 @@ requirements:
     # GLIBCXX_3.4.30+, which is only in libstdc++ from GCC 12+. Since we
     # compile with GCC 11, we need a newer libstdc++ runtime in $PREFIX/lib.
     - libstdcxx >=12
+    - libxml2
   run:
     - ${{ pin_compatible('cuda-version', lower_bound='x.x', upper_bound='x') }}
     - cuda-cudart
@@ -79,6 +80,7 @@ requirements:
     - xorg-libxinerama
     - alsa-lib
     - vulkan-headers
+    - libxml2
   ignore_run_exports:
     from_package:
       - cuda-cudart-dev
