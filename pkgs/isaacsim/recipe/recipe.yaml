@@ -80,7 +80,9 @@ requirements:
     - xorg-libxinerama
     - alsa-lib
     - vulkan-headers
-    - libxml2
+    # Isaac Sim's bundled extensions link against libxml2.so.2 (SONAME 2).
+    # conda-forge changed the SONAME to libxml2.so.16 in libxml2 2.13+.
+    - libxml2 <2.13
   ignore_run_exports:
     from_package:
       - cuda-cudart-dev
