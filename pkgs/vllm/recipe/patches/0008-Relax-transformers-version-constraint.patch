@@ -1,0 +1,26 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Build patch <noreply@localhost>
+Date: Wed, 12 Mar 2026 00:00:00 +0000
+Subject: [PATCH] Relax transformers version constraint for >=5.3
+
+vLLM 0.17.1 already has code paths for transformers 5.x:
+- vllm/transformers_utils/config.py checks Version("5.0.0")
+- vllm/model_executor/models/transformers/base.py requires >=5.0 for Eagle3
+The upper bound < 5 in requirements is overly conservative.
+---
+ requirements/common.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/requirements/common.txt b/requirements/common.txt
+index a8e1450fa..d26d10481 100644
+--- a/requirements/common.txt
++++ b/requirements/common.txt
+@@ -7,7 +7,7 @@ requests >= 2.26.0
+ tqdm
+ blake3
+ py-cpuinfo
+-transformers >= 4.56.0, < 5
++transformers >= 5.3
+ tokenizers >= 0.21.1  # Required for fast incremental detokenization.
+ protobuf >= 5.29.6, !=6.30.*, !=6.31.*, !=6.32.*, !=6.33.0.*, !=6.33.1.*, !=6.33.2.*, !=6.33.3.*, !=6.33.4.* # Required by LlamaTokenizer, gRPC. CVE-2026-0994
+ fastapi[standard] >= 0.115.0 # Required by FastAPI's form models in the OpenAI API server's audio transcriptions endpoint.

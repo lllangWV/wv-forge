@@ -1,0 +1,28 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Build patch <noreply@localhost>
+Date: Wed, 12 Mar 2026 00:00:00 +0000
+Subject: [PATCH] Configure build to target aarch64 even though CMake finds
+ x86_64 hardware
+
+When cross-compiling on x86_64 for aarch64, find_isa detects host ISA
+(AVX512/AVX2) instead of target (ASIMD). Override to correct values.
+---
+ cmake/cpu_extension.cmake | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/cmake/cpu_extension.cmake b/cmake/cpu_extension.cmake
+index dde8cc207..c67612eb6 100644
+--- a/cmake/cpu_extension.cmake
++++ b/cmake/cpu_extension.cmake
+@@ -88,6 +88,11 @@ else()
+     endif()
+ endif()
+
++set(ASIMD_FOUND TRUE)
++set(AVX512_FOUND FALSE)
++set(AVX2_FOUND FALSE)
++
++
+ if (CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64" OR ENABLE_X86_ISA)
+     set(ENABLE_X86_ISA ON)
+     if (NOT (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND
