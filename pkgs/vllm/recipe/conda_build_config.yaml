@@ -1,0 +1,3 @@
+# https://github.com/conda-forge/.cirun
+github_actions_labels:  # [linux]
+- cirun-openstack-cpu-4xlarge  # [linux]

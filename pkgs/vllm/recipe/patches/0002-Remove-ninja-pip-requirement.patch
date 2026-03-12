@@ -1,0 +1,23 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Build patch <noreply@localhost>
+Date: Wed, 12 Mar 2026 00:00:00 +0000
+Subject: [PATCH] Remove ninja pip requirement
+
+Ninja is provided by conda instead.
+---
+ requirements/common.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/requirements/common.txt b/requirements/common.txt
+index a8e1450fa..d6a14ec59 100644
+--- a/requirements/common.txt
++++ b/requirements/common.txt
+@@ -42,7 +42,7 @@ depyf==0.20.0 # required for profiling and debugging with compilation config
+ cloudpickle # allows pickling lambda functions in model_executor/models/registry.py
+ watchfiles # required for http server to monitor the updates of TLS files
+ python-json-logger # Used by logging as per examples/others/logging_configuration.md
+-ninja # Required for xgrammar, rocm, tpu, xpu
++
+ pybase64 # fast base64 implementation
+ cbor2 # Required for cross-language serialization of hashable objects
+ ijson # Required for mistral streaming tool parser
